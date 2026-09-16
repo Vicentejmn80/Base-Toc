@@ -33,7 +33,9 @@ export async function postAi<T>(path: string, body: unknown, signal?: AbortSigna
     if (error instanceof DOMException && error.name === 'AbortError') {
       throw new AiRequestError('La solicitud se canceló.', false)
     }
-    throw new AiRequestError('No hay conexión con el servidor de IA. ¿Está corriendo `npm run dev`?')
+    throw new AiRequestError(
+      'No hay conexión con el servidor de IA. En local, ejecuta `npm run dev`; en producción, revisa el despliegue en Vercel.',
+    )
   }
 
   if (!response.ok) {
