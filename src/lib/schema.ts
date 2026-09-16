@@ -221,7 +221,7 @@ export function captureExample(workspace: Workspace) {
   if (schema.booleanGoal && schema.identifier) {
     return `Ej. Hoy cumplí ${identifier.toLowerCase()} de leer`
   }
-  return `Ej. Agrega un registro nuevo de ${workspace.name}`
+  return `Ej. Cuéntame algo de ${workspace.name}`
 }
 
 export function recordDateValue(workspace: Workspace, record: RecordItem) {

@@ -338,3 +338,86 @@ export function validateCapture(
     'kind debe ser new_record, update_record, needs_disambiguation o needs_clarification.',
   )
 }
+
+export interface GlobalWorkspaceDef {
+  id: string
+  name: string
+  fields: CaptureFieldDef[]
+  records: CaptureRecordSummary[]
+}
+
+export type ModelGlobalIntent = {
+  id: string
+  workspaceId: string
+  capture: ModelCapture
+}
+
+export type ModelGlobalCapture =
+  | { kind: 'create_space'; seed: string }
+  | { kind: 'needs_clarification'; question: string }
+  | { kind: 'intents'; intents: ModelGlobalIntent[]; createSpace?: { seed: string } }
+
+function asCreateSeed(value: unknown, fallback: string) {
+  if (isRecord(value) && typeof value.seed === 'string' && value.seed.trim()) {
+    return value.seed.trim()
+  }
+  if (typeof value === 'string' && value.trim()) return value.trim()
+  return fallback
+}
+
+export function validateGlobalCapture(
+  value: unknown,
+  workspaces: GlobalWorkspaceDef[],
+  userMessage: string,
+): ModelGlobalCapture {
+  if (!isRecord(value)) throw new ValidationError('La respuesta del modelo no es un objeto.')
+  const kind = value.kind
+  const byId = new Map(workspaces.map((workspace) => [workspace.id, workspace]))
+
+  if (kind === 'needs_clarification' && !Array.isArray(value.intents)) {
+    return { kind: 'needs_clarification', question: asString(value.question, 'question') }
+  }
+
+  if (kind === 'create_space') {
+    return { kind: 'create_space', seed: asCreateSeed(value.seed, userMessage) }
+  }
+
+  if (kind !== 'intents') {
+    throw new ValidationError('kind debe ser intents, create_space o needs_clarification.')
+  }
+
+  if (!Array.isArray(value.intents)) {
+    throw new ValidationError('intents debe ser una lista.')
+  }
+
+  const intents: ModelGlobalIntent[] = []
+  value.intents.forEach((raw, index) => {
+    if (!isRecord(raw)) throw new ValidationError(`intents[${index}] no es un objeto.`)
+    const workspaceId = asString(raw.workspaceId, `intents[${index}].workspaceId`)
+    const workspace = byId.get(workspaceId)
+    if (!workspace) {
+      throw new ValidationError(`intents[${index}].workspaceId no existe.`)
+    }
+    const capture = validateCapture(raw, workspace.fields, workspace.records)
+    intents.push({
+      id: `intent_${index + 1}`,
+      workspaceId,
+      capture,
+    })
+  })
+
+  const createSpaceRaw = value.createSpace
+  const createSpace =
+    createSpaceRaw && createSpaceRaw !== null
+      ? { seed: asCreateSeed(createSpaceRaw, userMessage) }
+      : undefined
+
+  if (intents.length === 0 && createSpace) {
+    return { kind: 'create_space', seed: createSpace.seed }
+  }
+  if (intents.length === 0) {
+    return { kind: 'create_space', seed: userMessage }
+  }
+
+  return { kind: 'intents', intents, createSpace }
+}

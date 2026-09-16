@@ -5,6 +5,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { handleAnalyze } from './handlers/analyze.ts'
 import { handleCapture } from './handlers/capture.ts'
+import { handleCaptureGlobal } from './handlers/captureGlobal.ts'
 import { handleCreation } from './handlers/creation.ts'
 import { errorMessage, errorStatus } from './handlers/http.ts'
 
@@ -45,6 +46,10 @@ app.post('/api/ai/creation', (req, res) => {
 
 app.post('/api/ai/capture', (req, res) => {
   void sendJson(res, handleCapture, req.body)
+})
+
+app.post('/api/ai/capture-global', (req, res) => {
+  void sendJson(res, handleCaptureGlobal, req.body)
 })
 
 app.post('/api/ai/analyze', (req, res) => {

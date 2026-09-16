@@ -17,10 +17,10 @@ export class AiConfigError extends Error {
   }
 }
 
-function getClient() {
+function getClient(timeoutMs = TIMEOUT_MS) {
   const apiKey = process.env.OPENAI_API_KEY
   if (!apiKey) throw new AiConfigError()
-  return new OpenAI({ apiKey, timeout: TIMEOUT_MS })
+  return new OpenAI({ apiKey, timeout: timeoutMs })
 }
 
 export function getModel() {
@@ -30,8 +30,9 @@ export function getModel() {
 export async function completeJson(options: {
   system: string
   messages: { role: 'user' | 'assistant'; content: string }[]
+  timeoutMs?: number
 }): Promise<string> {
-  const client = getClient()
+  const client = getClient(options.timeoutMs)
   try {
     const response = await client.chat.completions.create({
       model: getModel(),

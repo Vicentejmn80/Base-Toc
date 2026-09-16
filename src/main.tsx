@@ -5,6 +5,7 @@ import { App } from './App'
 import { AppStoreProvider } from './state/store'
 import { ToastProvider } from './state/toast'
 import { InstallProvider } from './pwa/install'
+import { GlobalCaptureProvider } from './state/globalCapture'
 import { registerServiceWorker } from './pwa/register'
 import './index.css'
 
@@ -16,7 +17,9 @@ createRoot(document.getElementById('root')!).render(
       <AppStoreProvider>
         <ToastProvider>
           <InstallProvider>
-            <App />
+            <GlobalCaptureProvider>
+              <App />
+            </GlobalCaptureProvider>
           </InstallProvider>
         </ToastProvider>
       </AppStoreProvider>

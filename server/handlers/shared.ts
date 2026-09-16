@@ -127,9 +127,10 @@ export async function runValidated<T>(
   system: string,
   messages: HistoryTurn[],
   validate: (value: unknown) => T,
+  timeoutMs?: number,
 ): Promise<T> {
   try {
-    const first = await completeJson({ system, messages })
+    const first = await completeJson({ system, messages, timeoutMs })
     return validate(parseModelJson(first))
   } catch (error) {
     if (error instanceof AiTimeoutError || error instanceof AiConfigError) throw error
@@ -137,6 +138,7 @@ export async function runValidated<T>(
     const retry = await completeJson({
       system: `${system}\n\nEl intento anterior falló la validación: ${error instanceof Error ? error.message : 'formato inválido'}. Devuelve SOLO JSON válido con la forma pedida.`,
       messages,
+      timeoutMs,
     })
     return validate(parseModelJson(retry))
   }

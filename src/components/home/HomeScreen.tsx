@@ -7,6 +7,7 @@ import { WorkspaceIcon } from '../ui/WorkspaceIcon'
 import { ExamplesGallery } from './ExamplesGallery'
 import { useAppStore } from '../../state/store'
 import { useToast } from '../../state/toast'
+import { useGlobalCapture } from '../../state/globalCapture'
 import { greetingForNow } from '../../lib/dates'
 import { useAppExperience } from '../../lib/experience'
 import {
@@ -52,6 +53,7 @@ export function HomeScreen() {
   const { workspaces, activities } = useAppStore()
   const experience = useAppExperience()
   const { showToast } = useToast()
+  const { openCapture } = useGlobalCapture()
   const navigate = useNavigate()
   const location = useLocation()
   const [prompt, setPrompt] = useState('')
@@ -114,10 +116,21 @@ export function HomeScreen() {
       const message =
         error instanceof AiRequestError
           ? error.message
-          : 'No se pudo completar la solicitud a la IA.'
+          : 'No pude completar eso ahora. ¿Lo intentamos de nuevo?'
       setCreationStatus('error')
       setCreationError(message)
     }
+  }
+
+  function handleHomeSubmit(text: string) {
+    const next = text.trim()
+    if (!next) return
+    if (hasSpaces && dialogueState.stage !== 'awaiting_clarification') {
+      openCapture(next)
+      setPrompt('')
+      return
+    }
+    void startFromPrompt(next)
   }
 
   const spacesSection = hasSpaces ? (
@@ -235,11 +248,16 @@ export function HomeScreen() {
             <PromptBox
               value={prompt}
               busy={creationStatus === 'loading'}
-              voiceScope="home"
+              voiceScope={hasSpaces ? 'global' : 'home'}
+              placeholder={
+                hasSpaces
+                  ? 'Cuéntame qué pasó, o qué quieres empezar a medir...'
+                  : undefined
+              }
               onChange={setPrompt}
-              onSubmit={() => startFromPrompt(prompt)}
+              onSubmit={() => handleHomeSubmit(prompt)}
               onVoiceTranscript={(text) => {
-                startFromPrompt(text)
+                handleHomeSubmit(text)
               }}
               onSoon={(message) => showToast(message)}
             />

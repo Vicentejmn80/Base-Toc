@@ -120,7 +120,7 @@ export function MobileHomeStory({
           onClick={() => setCreateOpen(true)}
           className="flex min-h-12 w-full items-center justify-center rounded-2xl border border-dashed border-line bg-white text-sm font-medium text-muted"
         >
-          Crear un espacio nuevo
+          Quiero medir algo nuevo
         </button>
       )}
     </div>

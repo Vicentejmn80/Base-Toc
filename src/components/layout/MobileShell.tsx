@@ -33,7 +33,7 @@ export function MobileShell() {
         ) : (
           <div className="flex min-h-[60vh] flex-col items-center justify-center gap-3 text-sm text-muted">
             <div className="h-8 w-8 animate-pulse rounded-full bg-line" />
-            Preparando tus espacios...
+            Preparando lo tuyo...
           </div>
         )}
       </main>

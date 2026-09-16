@@ -1,6 +1,7 @@
 import { Check } from 'lucide-react'
 import type { WorkspaceProposal } from '../../domain/types'
 import { CREATION_STEPS, materializeProposal } from '../../interpretation/creation'
+import { useAppExperience } from '../../lib/experience'
 import { useAppStore } from '../../state/store'
 import { useToast } from '../../state/toast'
 import { Button } from '../ui/Button'
@@ -27,6 +28,7 @@ export function CreationFlow({
 }: CreationFlowProps) {
   const { createWorkspace } = useAppStore()
   const { showToast } = useToast()
+  const plain = useAppExperience() === 'mobile'
 
   if (status === 'idle' || (status === 'ready' && !proposal)) return null
 
@@ -48,22 +50,24 @@ export function CreationFlow({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center p-3 sm:items-center">
+    <div className="fixed inset-0 z-[60] flex items-end justify-center p-3 sm:items-center">
       <button type="button" className="absolute inset-0 bg-slate-900/30 backdrop-blur-[2px]" onClick={onClose} aria-label="Cerrar" />
       <div className="ai-accent relative z-10 w-full max-w-xl overflow-hidden rounded-3xl shadow-[var(--shadow-float)]">
         <div className="border-b border-line px-5 py-4 sm:px-6">
           <p className="ai-label text-xs font-semibold uppercase tracking-[0.16em]">
-            {failed ? 'No se pudo crear' : ready ? 'Espacio listo para confirmar' : 'Diseñando tu espacio'}
+            {failed ? (plain ? 'No pude armarlo' : 'No se pudo crear') : ready ? (plain ? '¿Lo creamos?' : 'Espacio listo para confirmar') : (plain ? 'Un segundo' : 'Diseñando tu espacio')}
           </p>
           <h2 className="type-title mt-2">
-            {ready && proposal ? proposal.name : failed ? 'La IA no respondió' : 'Diseñando tu espacio'}
+            {ready && proposal ? proposal.name : failed ? (plain ? 'Se trabó un momento' : 'La IA no respondió') : (plain ? 'Estoy armando este espacio' : 'Diseñando tu espacio')}
           </h2>
           <p className="type-meta mt-1">
             {ready && proposal
               ? proposal.description
               : failed
-                ? errorMessage || 'No se pudo completar la solicitud.'
-                : 'Esperando la respuesta real del modelo. Esto puede tardar unos segundos.'}
+                ? errorMessage || (plain ? 'No pude completar eso ahora.' : 'No se pudo completar la solicitud.')
+                : plain
+                  ? 'Dame un segundo, estoy armando este espacio.'
+                  : 'Esperando la respuesta real del modelo. Esto puede tardar unos segundos.'}
           </p>
           {loading ? (
             <div className="mt-4 h-1 overflow-hidden rounded-full bg-soft">
@@ -101,7 +105,7 @@ export function CreationFlow({
 
           {failed ? (
             <div className="rounded-2xl border border-danger/20 bg-danger-soft px-4 py-3 text-sm text-danger">
-              {errorMessage || 'No se pudo completar la solicitud a la IA.'}
+              {errorMessage || (plain ? 'No pude completar eso ahora. ¿Lo intentamos de nuevo?' : 'No se pudo completar la solicitud a la IA.')}
             </div>
           ) : null}
 

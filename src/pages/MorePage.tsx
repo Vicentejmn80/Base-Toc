@@ -41,8 +41,8 @@ export function MorePage() {
       <section className="rounded-3xl border border-line bg-white p-4 shadow-[var(--shadow-card)]">
         <p className="text-sm font-semibold text-ink">Datos</p>
         <p className="mt-1 text-sm text-muted">
-          Tus espacios y registros viven en este dispositivo. Sin conexión, el shell de la app sigue disponible
-          después de la primera visita.
+          Tus espacios y lo que vas anotando viven en este dispositivo. Sin conexión, la app sigue
+          abierta después de la primera visita.
         </p>
       </section>
     </div>

@@ -1,7 +1,7 @@
 import type { FieldValue, Workspace, WorkspaceKind } from '../domain/types'
 import { daysFromNow, toIsoDate } from './dates'
 
-export type VoiceScope = WorkspaceKind | 'home'
+export type VoiceScope = WorkspaceKind | 'home' | 'global'
 
 interface VoiceSimulationResult {
   transcript: string
@@ -18,6 +18,11 @@ const transcripts: Record<VoiceScope, string[]> = {
     'Ayúdame a organizar mis gastos mensuales para entender en qué se me va el dinero.',
     'Quiero registrar mis entrenamientos de running para ver si estoy mejorando mi ritmo.',
     'Necesito un espacio para seguir mis hábitos diarios de estudio y lectura.',
+  ],
+  global: [
+    'Hoy gasté 40 dólares en el mercado.',
+    'Hoy gasté 40 dólares en el mercado y contacté al Colegio Newton.',
+    'Hoy planté albahaca y tomates en el balcón.',
   ],
   crm: [
     'Contacté al Colegio San José por Instagram, me dijeron que sí les interesa y que les escriba el viernes.',
@@ -44,10 +49,10 @@ const transcripts: Record<VoiceScope, string[]> = {
     'Dormí más de 7 horas, hábito completado.',
   ],
   custom: [
-    'Agrega un nuevo registro con estado en curso para hoy.',
-    'Anota una tarea pendiente para esta semana.',
-    'Crea un registro de seguimiento para mañana.',
-    'Registra un avance importante del proyecto.',
+    'Anota que hoy avancé con el proyecto.',
+    'Hoy dejé una tarea pendiente para esta semana.',
+    'Quiero seguir un tema nuevo a partir de mañana.',
+    'Hoy hubo un avance importante, anótalo.',
   ],
 }
 

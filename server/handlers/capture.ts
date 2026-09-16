@@ -3,6 +3,7 @@ import {
   validateCapture,
   type CaptureFieldDef,
   type CaptureRecordSummary,
+  type ModelCapture,
 } from '../validate.ts'
 import {
   captureTokenHits,
@@ -13,14 +14,14 @@ import {
   type HistoryTurn,
 } from './shared.ts'
 
-export async function handleCapture(body: unknown) {
-  const payload = body as Record<string, unknown>
-  const message = typeof payload?.message === 'string' ? payload.message.trim() : ''
-  if (!message) {
-    throw new HttpError(400, 'Cuéntame qué pasó para poder interpretarlo.')
-  }
+export interface CaptureWorkspaceContext {
+  name: string
+  kind: string
+  fields: CaptureFieldDef[]
+  records: CaptureRecordSummary[]
+}
 
-  const workspace = payload?.workspace
+export function readCaptureWorkspace(workspace: unknown): CaptureWorkspaceContext {
   if (!workspace || typeof workspace !== 'object') {
     throw new HttpError(400, 'Falta el contexto del espacio.')
   }
@@ -64,36 +65,46 @@ export async function handleCapture(body: unknown) {
         }))
     : []
 
-  const history = Array.isArray(payload?.history)
-    ? payload.history.filter((item: unknown): item is HistoryTurn => isHistoryTurn(item)).slice(-8)
-    : []
+  return {
+    name: typeof ws.name === 'string' ? ws.name : 'sin nombre',
+    kind: typeof ws.kind === 'string' ? ws.kind : 'custom',
+    fields,
+    records,
+  }
+}
 
-  const selectedRecordId =
-    typeof payload?.selectedRecordId === 'string' ? payload.selectedRecordId : undefined
-  const today =
-    typeof payload?.today === 'string' ? payload.today : new Date().toISOString().slice(0, 10)
-
-  const system = `${CAPTURE_SYSTEM_PROMPT}
+export function captureSystemPrompt(
+  ctx: CaptureWorkspaceContext,
+  today: string,
+  selectedRecordId?: string,
+  previousProposal?: unknown,
+) {
+  return `${CAPTURE_SYSTEM_PROMPT}
 
 Fecha de hoy: ${today}.
-Espacio: ${typeof ws.name === 'string' ? ws.name : 'sin nombre'} (${typeof ws.kind === 'string' ? ws.kind : 'custom'}).
+Espacio: ${ctx.name} (${ctx.kind}).
 Campos:
-${fields.map((field) => `- ${field.key} (${field.label}, type ${field.type}${field.role ? `, role ${field.role}` : ''}${field.unit ? `, unit ${field.unit}` : ''}${field.options?.length ? `; opciones EXACTAS: ${field.options.map((option) => option.value).join(' | ')}` : ''})`).join('\n')}
+${ctx.fields.map((field) => `- ${field.key} (${field.label}, type ${field.type}${field.role ? `, role ${field.role}` : ''}${field.unit ? `, unit ${field.unit}` : ''}${field.options?.length ? `; opciones EXACTAS: ${field.options.map((option) => option.value).join(' | ')}` : ''})`).join('\n')}
 
 Registros existentes (id · título · estado):
-${records.length ? records.map((record) => `- ${record.id} · ${record.title}${record.status ? ` · ${record.status}` : ''}`).join('\n') : '- ninguno'}
+${ctx.records.length ? ctx.records.map((record) => `- ${record.id} · ${record.title}${record.status ? ` · ${record.status}` : ''}`).join('\n') : '- ninguno'}
 
 ${selectedRecordId ? `El usuario ya eligió el registro ${selectedRecordId}. Debes devolver update_record con ese recordId.` : ''}
-${payload?.previousProposal ? `Propuesta anterior a corregir: ${JSON.stringify(payload.previousProposal)}` : ''}
+${previousProposal ? `Propuesta anterior a corregir: ${JSON.stringify(previousProposal)}` : ''}
 `
+}
 
-  const messages: HistoryTurn[] = [...history, { role: 'user', content: message }]
+export function finalizeCaptureResult(
+  parsed: ModelCapture,
+  input: {
+    message: string
+    records: CaptureRecordSummary[]
+    selectedRecordId?: string
+    previousProposal?: { kind?: string; values?: Record<string, unknown>; recordId?: string }
+  },
+): ModelCapture {
+  const { message, records, selectedRecordId, previousProposal } = input
 
-  const parsed = await runValidated(system, messages, (value) => validateCapture(value, fields, records))
-
-  const previousProposal = payload?.previousProposal as
-    | { kind?: string; values?: Record<string, unknown> }
-    | undefined
   if (
     previousProposal &&
     previousProposal.kind === 'new_record' &&
@@ -104,7 +115,7 @@ ${payload?.previousProposal ? `Propuesta anterior a corregir: ${JSON.stringify(p
       kind: 'new_record',
       values: {
         ...(typeof previousProposal.values === 'object' && previousProposal.values
-          ? previousProposal.values
+          ? (previousProposal.values as Record<string, string | number | boolean>)
           : {}),
         ...parsed.values,
       },
@@ -138,4 +149,38 @@ ${payload?.previousProposal ? `Propuesta anterior a corregir: ${JSON.stringify(p
   }
 
   return parsed
+}
+
+export async function handleCapture(body: unknown) {
+  const payload = body as Record<string, unknown>
+  const message = typeof payload?.message === 'string' ? payload.message.trim() : ''
+  if (!message) {
+    throw new HttpError(400, 'Cuéntame qué pasó para poder interpretarlo.')
+  }
+
+  const ctx = readCaptureWorkspace(payload?.workspace)
+  const history = Array.isArray(payload?.history)
+    ? payload.history.filter((item: unknown): item is HistoryTurn => isHistoryTurn(item)).slice(-8)
+    : []
+
+  const selectedRecordId =
+    typeof payload?.selectedRecordId === 'string' ? payload.selectedRecordId : undefined
+  const today =
+    typeof payload?.today === 'string' ? payload.today : new Date().toISOString().slice(0, 10)
+  const previousProposal = payload?.previousProposal as
+    | { kind?: string; values?: Record<string, unknown>; recordId?: string }
+    | undefined
+
+  const system = captureSystemPrompt(ctx, today, selectedRecordId, previousProposal)
+  const messages: HistoryTurn[] = [...history, { role: 'user', content: message }]
+  const parsed = await runValidated(system, messages, (value) =>
+    validateCapture(value, ctx.fields, ctx.records),
+  )
+
+  return finalizeCaptureResult(parsed, {
+    message,
+    records: ctx.records,
+    selectedRecordId,
+    previousProposal,
+  })
 }
