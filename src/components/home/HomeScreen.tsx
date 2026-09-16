@@ -8,6 +8,7 @@ import { ExamplesGallery } from './ExamplesGallery'
 import { useAppStore } from '../../state/store'
 import { useToast } from '../../state/toast'
 import { greetingForNow } from '../../lib/dates'
+import { useAppExperience } from '../../lib/experience'
 import {
   continueCreationDialogue,
   emptyDialogueState,
@@ -17,6 +18,7 @@ import {
 import { AiRequestError } from '../../lib/aiClient'
 import type { WorkspaceProposal } from '../../domain/types'
 import { exampleGallery } from '../../data/exampleGallery'
+import { MobileHomeStory } from '../mobile/MobileHomeStory'
 
 const quickActions = [
   {
@@ -47,7 +49,8 @@ const quickActions = [
 ]
 
 export function HomeScreen() {
-  const { workspaces } = useAppStore()
+  const { workspaces, activities } = useAppStore()
+  const experience = useAppExperience()
   const { showToast } = useToast()
   const navigate = useNavigate()
   const location = useLocation()
@@ -157,6 +160,46 @@ export function HomeScreen() {
     />
   )
 
+  const creationFlow = (
+    <CreationFlow
+      proposal={proposal}
+      status={creationStatus}
+      errorMessage={creationError}
+      onClose={resetCreation}
+      onRetry={() => {
+        const attempt = lastAttempt.current
+        if (!attempt) return
+        startFromPrompt(attempt.message, attempt.state)
+      }}
+      onOpened={(id) => {
+        resetCreation()
+        setPrompt('')
+        setAssistantQuestion(null)
+        setDialogueState(emptyDialogueState())
+        navigate(`/workspaces/${id}`)
+      }}
+    />
+  )
+
+  if (experience === 'mobile' && hasSpaces) {
+    return (
+      <div>
+        <MobileHomeStory
+          workspaces={workspaces}
+          activities={activities}
+          prompt={prompt}
+          busy={creationStatus === 'loading'}
+          assistantQuestion={assistantQuestion}
+          onPromptChange={setPrompt}
+          onSubmit={() => startFromPrompt(prompt)}
+          onVoiceTranscript={(text) => startFromPrompt(text)}
+          onSoon={(message) => showToast(message)}
+        />
+        {creationFlow}
+      </div>
+    )
+  }
+
   return (
     <div>
       <section className="home-hero">
@@ -229,24 +272,7 @@ export function HomeScreen() {
         {hasSpaces ? spacesSection : gallery}
         {hasSpaces ? gallery : spacesSection}
 
-        <CreationFlow
-          proposal={proposal}
-          status={creationStatus}
-          errorMessage={creationError}
-          onClose={resetCreation}
-          onRetry={() => {
-            const attempt = lastAttempt.current
-            if (!attempt) return
-            startFromPrompt(attempt.message, attempt.state)
-          }}
-          onOpened={(id) => {
-            resetCreation()
-            setPrompt('')
-            setAssistantQuestion(null)
-            setDialogueState(emptyDialogueState())
-            navigate(`/workspaces/${id}`)
-          }}
-        />
+        {creationFlow}
       </div>
     </div>
   )

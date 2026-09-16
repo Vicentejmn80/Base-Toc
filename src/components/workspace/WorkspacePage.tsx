@@ -20,6 +20,7 @@ import { FollowUps } from '../dashboard/FollowUps'
 import { ActivityFeed } from '../dashboard/ActivityFeed'
 import { WorkspaceComposer } from './WorkspaceComposer'
 import { CaptureLauncher, CaptureSheet } from './CaptureSheet'
+import { MobileProgressFeed } from '../mobile/MobileProgressFeed'
 import { computeMetrics } from '../../metrics'
 import { isWithinPeriod, type PeriodKey } from '../../lib/dates'
 import type { Goal, RecordItem } from '../../domain/types'
@@ -50,7 +51,14 @@ export function WorkspacePage() {
   const experience = useAppExperience()
 
   const tab = (tabs.some((item) => item.id === params.get('tab')) ? params.get('tab') : 'resumen') as TabId
-  const period = (['7d', '30d', '90d', 'all'].includes(params.get('period') ?? '') ? params.get('period') : 'all') as PeriodKey
+  const periodParam = params.get('period')
+  const period = (
+    ['7d', '30d', '90d', 'all'].includes(periodParam ?? '')
+      ? periodParam
+      : experience === 'mobile'
+        ? '7d'
+        : 'all'
+  ) as PeriodKey
 
   const [formOpen, setFormOpen] = useState(false)
   const [captureOpen, setCaptureOpen] = useState(false)
@@ -132,9 +140,92 @@ export function WorkspacePage() {
     setGoalOpen(true)
   }
 
+  function setTab(nextTab: TabId) {
+    const next = new URLSearchParams(params)
+    next.set('tab', nextTab)
+    setParams(next)
+  }
+
+  const isMobile = experience === 'mobile'
+  const showFeed = isMobile && tab === 'resumen'
+  const mobileTabs = [
+    { id: 'resumen', label: 'Tu progreso' },
+    { id: 'tabla', label: 'Tabla' },
+    { id: 'graficos', label: 'Gráficos' },
+    { id: 'actividad', label: 'Actividad' },
+  ] as const
+
+  const overflowMenu = (
+    <div className="relative">
+      <Button variant="secondary" onClick={() => setMenuOpen((open) => !open)} aria-label="Más acciones" className="min-h-11 min-w-11">
+        <MoreHorizontal size={16} />
+      </Button>
+      {menuOpen ? (
+        <div className="absolute right-0 z-20 mt-2 w-48 rounded-2xl border border-line bg-white p-1 shadow-[var(--shadow-float)]">
+          {isMobile ? (
+            <>
+              <button
+                type="button"
+                className="block w-full rounded-xl px-3 py-2 text-left text-sm hover:bg-soft"
+                onClick={() => {
+                  openCreate()
+                  setMenuOpen(false)
+                }}
+              >
+                Llenar formulario
+              </button>
+              <button
+                type="button"
+                className="block w-full rounded-xl px-3 py-2 text-left text-sm hover:bg-soft"
+                onClick={() => {
+                  openGoalEditor()
+                  setMenuOpen(false)
+                }}
+              >
+                Definir meta
+              </button>
+              <button
+                type="button"
+                className="block w-full rounded-xl px-3 py-2 text-left text-sm hover:bg-soft"
+                onClick={() => {
+                  void analyzeProgress()
+                  setMenuOpen(false)
+                }}
+              >
+                Analizar
+              </button>
+            </>
+          ) : null}
+          <button
+            type="button"
+            className="block w-full rounded-xl px-3 py-2 text-left text-sm hover:bg-soft"
+            onClick={() => {
+              setSpaceName(workspace.name)
+              setSpaceDescription(workspace.description)
+              setEditSpaceOpen(true)
+              setMenuOpen(false)
+            }}
+          >
+            Editar espacio
+          </button>
+          <button
+            type="button"
+            className="block w-full rounded-xl px-3 py-2 text-left text-sm text-danger hover:bg-danger-soft"
+            onClick={() => {
+              setDeleteSpaceOpen(true)
+              setMenuOpen(false)
+            }}
+          >
+            Eliminar espacio
+          </button>
+        </div>
+      ) : null}
+    </div>
+  )
+
   return (
     <div className="space-y-8">
-      {experience === 'mobile' ? (
+      {isMobile ? (
         <div className="sticky top-0 z-20 -mx-4 mb-1 flex items-center gap-1 border-b border-line bg-canvas/95 px-2 py-1 backdrop-blur">
           <Link
             to="/spaces"
@@ -146,6 +237,47 @@ export function WorkspacePage() {
           <p className="truncate text-sm font-semibold">{workspace.name}</p>
         </div>
       ) : null}
+
+      {isMobile ? (
+        <div className="space-y-3">
+          <div className="flex items-center gap-2">
+            <select
+              value={period}
+              onChange={(event) => {
+                const next = new URLSearchParams(params)
+                next.set('period', event.target.value)
+                setParams(next)
+              }}
+              className="min-h-11 flex-1 rounded-xl border border-line bg-white px-3 py-2 text-base"
+              aria-label="Periodo"
+            >
+              <option value="7d">Esta semana</option>
+              <option value="30d">Este mes</option>
+              <option value="90d">90 días</option>
+              <option value="all">Todo</option>
+            </select>
+            <CaptureLauncher onClick={() => setCaptureOpen(true)} />
+            {overflowMenu}
+          </div>
+          {!showFeed ? (
+            <div className="flex gap-1 overflow-auto rounded-2xl bg-canvas p-1">
+              {mobileTabs.map((item) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => setTab(item.id)}
+                  className={cn(
+                    'min-h-11 whitespace-nowrap rounded-xl px-3 py-2 text-sm text-muted',
+                    tab === item.id && 'bg-white text-ink shadow-sm',
+                  )}
+                >
+                  {item.label}
+                </button>
+              ))}
+            </div>
+          ) : null}
+        </div>
+      ) : (
       <header className="flex flex-col gap-5 rounded-3xl border border-line bg-white p-5 shadow-[var(--shadow-card)] sm:p-6">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div className="flex items-start gap-3">
@@ -187,37 +319,7 @@ export function WorkspacePage() {
               <span className="sm:hidden">Analizar</span>
               <span className="hidden sm:inline">Analizar mi progreso</span>
             </Button>
-            <div className="relative">
-              <Button variant="secondary" onClick={() => setMenuOpen((open) => !open)} aria-label="Más acciones" className="min-h-11 min-w-11">
-                <MoreHorizontal size={16} />
-              </Button>
-              {menuOpen ? (
-                <div className="absolute right-0 z-20 mt-2 w-48 rounded-2xl border border-line bg-white p-1 shadow-[var(--shadow-float)]">
-                  <button
-                    type="button"
-                    className="block w-full rounded-xl px-3 py-2 text-left text-sm hover:bg-soft"
-                    onClick={() => {
-                      setSpaceName(workspace.name)
-                      setSpaceDescription(workspace.description)
-                      setEditSpaceOpen(true)
-                      setMenuOpen(false)
-                    }}
-                  >
-                    Editar espacio
-                  </button>
-                  <button
-                    type="button"
-                    className="block w-full rounded-xl px-3 py-2 text-left text-sm text-danger hover:bg-danger-soft"
-                    onClick={() => {
-                      setDeleteSpaceOpen(true)
-                      setMenuOpen(false)
-                    }}
-                  >
-                    Eliminar espacio
-                  </button>
-                </div>
-              ) : null}
-            </div>
+            {overflowMenu}
           </div>
         </div>
 
@@ -226,11 +328,7 @@ export function WorkspacePage() {
             <button
               key={item.id}
               type="button"
-              onClick={() => {
-                const next = new URLSearchParams(params)
-                next.set('tab', item.id)
-                setParams(next)
-              }}
+              onClick={() => setTab(item.id)}
               className={cn(
                 'min-h-11 whitespace-nowrap rounded-xl px-3 py-2 text-sm text-muted',
                 tab === item.id && 'bg-white text-ink shadow-sm',
@@ -241,8 +339,29 @@ export function WorkspacePage() {
           ))}
         </div>
       </header>
+      )}
 
-      {tab === 'resumen' ? (
+      {showFeed ? (
+        <div className="space-y-4">
+          <MobileProgressFeed
+            workspace={workspace}
+            period={period}
+            activities={workspaceActivities}
+            onSeeDetail={() => setTab('tabla')}
+            onDefineGoal={openGoalEditor}
+          />
+          {analysisStatus !== 'idle' ? (
+            <AnalysisCard
+              status={analysisStatus}
+              analysis={analysis}
+              errorMessage={analysisError}
+              onRetry={() => void analyzeProgress()}
+            />
+          ) : null}
+        </div>
+      ) : null}
+
+      {tab === 'resumen' && !isMobile ? (
         <div className="space-y-8">
           <NarrativeSummary workspace={workspace} period={period} />
           <GoalCard
