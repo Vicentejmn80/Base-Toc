@@ -12,10 +12,15 @@ export function MorePage() {
       </header>
 
       <section className="rounded-3xl border border-line bg-white p-4 shadow-[var(--shadow-card)]">
-        <p className="text-sm font-semibold text-ink">App en este dispositivo</p>
-        <p className="mt-1 text-sm text-muted">
-          Nexora puede instalarse y abrirse a pantalla completa, sin la barra del navegador.
-        </p>
+        <div className="flex items-start gap-3">
+          <img src="/icons/icon-192.png" alt="" className="h-11 w-11 rounded-2xl" />
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-semibold text-ink">App en este dispositivo</p>
+            <p className="mt-1 text-sm text-muted">
+              Nexora puede instalarse y abrirse a pantalla completa, sin la barra del navegador.
+            </p>
+          </div>
+        </div>
         {canInstall ? (
           <button
             type="button"

@@ -1,4 +1,17 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="none">
-  <rect width="32" height="32" rx="9" fill="#111827"/>
-  <path d="M9 22V10h3.1l5.2 7.6V10H21v12h-3.1l-5.2-7.6V22H9z" fill="#fff"/>
+  <rect width="32" height="32" rx="8" fill="#06123A"/>
+  <path
+    d="M6.5 21.5c3.2-1.4 4.8-5.2 8.2-4.6 3.4.6 4.6 5.4 10.3-6.4"
+    stroke="url(#wave)"
+    stroke-width="3.1"
+    stroke-linecap="round"
+  />
+  <circle cx="25.2" cy="10.3" r="2.35" fill="#FF9A3C"/>
+  <defs>
+    <linearGradient id="wave" x1="6.5" y1="21.5" x2="25" y2="10">
+      <stop stop-color="#3B82F6"/>
+      <stop offset=".45" stop-color="#A855F7"/>
+      <stop offset="1" stop-color="#FB7185"/>
+    </linearGradient>
+  </defs>
 </svg>

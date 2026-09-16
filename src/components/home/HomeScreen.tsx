@@ -211,9 +211,7 @@ export function HomeScreen() {
         <div className="relative z-10 mx-auto max-w-3xl px-4 sm:px-6">
           <header className="mb-8 flex items-center justify-between lg:hidden">
             <div className="flex items-center gap-2">
-              <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-white/10 text-sm font-semibold text-white ring-1 ring-white/15">
-                N
-              </span>
+              <img src="/icons/icon-192.png" alt="" className="h-8 w-8 rounded-xl ring-1 ring-white/15" />
               <span className="font-semibold text-white">Nexora</span>
             </div>
           </header>

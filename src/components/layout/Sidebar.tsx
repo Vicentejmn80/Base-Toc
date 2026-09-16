@@ -11,9 +11,7 @@ export function Sidebar() {
   return (
     <aside className="fixed inset-y-0 left-0 z-30 flex w-[260px] flex-col border-r border-line bg-white/90 px-4 py-5 backdrop-blur">
       <NavLink to="/" className="mb-8 flex items-center gap-2.5 px-2">
-        <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-ink text-sm font-semibold text-white">
-          N
-        </span>
+        <img src="/icons/icon-192.png" alt="" className="h-8 w-8 rounded-xl" />
         <span className="text-[15px] font-semibold tracking-tight">Nexora</span>
       </NavLink>
 
