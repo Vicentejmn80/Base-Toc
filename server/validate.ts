@@ -1,0 +1,340 @@
+const FIELD_TYPES = new Set(['text', 'longText', 'number', 'date', 'select', 'boolean'])
+const FIELD_ROLES = new Set(['amount', 'date', 'status', 'category', 'identifier', 'boolean_goal'])
+const KINDS = new Set(['crm', 'finance', 'fitness', 'habits', 'custom'])
+const ICONS = new Set(['building', 'wallet', 'activity', 'sparkles', 'layers'])
+
+export class ValidationError extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = 'ValidationError'
+  }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+function asString(value: unknown, field: string) {
+  if (typeof value !== 'string' || !value.trim()) {
+    throw new ValidationError(`Falta "${field}" o no es texto.`)
+  }
+  return value.trim()
+}
+
+function asOptionalString(value: unknown) {
+  return typeof value === 'string' && value.trim() ? value.trim() : undefined
+}
+
+function asStringList(value: unknown, field: string, min: number, max: number) {
+  if (!Array.isArray(value) || value.length < min || value.length > max) {
+    throw new ValidationError(`"${field}" debe ser una lista de ${min} a ${max} textos.`)
+  }
+  const items = value.map((item, index) => {
+    if (typeof item !== 'string' || !item.trim()) {
+      throw new ValidationError(`"${field}[${index}]" no es texto válido.`)
+    }
+    return item.trim()
+  })
+  return items
+}
+
+export interface ModelField {
+  key: string
+  label: string
+  type: 'text' | 'longText' | 'number' | 'date' | 'select' | 'boolean'
+  role?: 'amount' | 'date' | 'status' | 'category' | 'identifier' | 'boolean_goal'
+  unit?: string
+  required?: boolean
+  options?: { value: string; label: string }[]
+  placeholder?: string
+}
+
+export interface ModelProposal {
+  name: string
+  description: string
+  kind: 'crm' | 'finance' | 'fitness' | 'habits' | 'custom'
+  icon: string
+  color: string
+  rationale: string[]
+  fields: ModelField[]
+  goal?: {
+    label: string
+    target: number
+    unit?: string
+    deadline?: string
+  }
+}
+
+export type ModelCreation =
+  | { kind: 'ask'; question: string }
+  | { kind: 'propose'; proposal: ModelProposal }
+
+export function parseModelJson(raw: string): unknown {
+  try {
+    return JSON.parse(raw)
+  } catch {
+    throw new ValidationError('El modelo no devolvió JSON válido.')
+  }
+}
+
+export function validateCreation(value: unknown): ModelCreation {
+  if (!isRecord(value)) throw new ValidationError('La respuesta del modelo no es un objeto.')
+  const kind = value.kind
+  if (kind === 'ask') {
+    return { kind: 'ask', question: asString(value.question, 'question') }
+  }
+  if (kind !== 'propose') {
+    throw new ValidationError('kind debe ser "ask" o "propose".')
+  }
+  if (!isRecord(value.proposal)) {
+    throw new ValidationError('Falta proposal.')
+  }
+  return { kind: 'propose', proposal: validateProposal(value.proposal) }
+}
+
+function validateProposal(value: Record<string, unknown>): ModelProposal {
+  const kind = asString(value.kind, 'proposal.kind')
+  if (!KINDS.has(kind)) throw new ValidationError(`kind inválido: ${kind}`)
+  const icon = asString(value.icon, 'proposal.icon')
+  if (!ICONS.has(icon)) throw new ValidationError(`icon inválido: ${icon}`)
+
+  const colorRaw = asString(value.color, 'proposal.color')
+  const color = /^#([0-9a-fA-F]{6})$/.test(colorRaw) ? colorRaw : '#4F46E5'
+
+  if (!Array.isArray(value.fields) || value.fields.length < 3 || value.fields.length > 8) {
+    throw new ValidationError('proposal.fields debe tener entre 3 y 8 campos.')
+  }
+
+  const fields = value.fields.map((field, index) => validateField(field, index))
+
+  let goal: ModelProposal['goal']
+  if (value.goal && value.goal !== null && isRecord(value.goal)) {
+    const target = Number(value.goal.target)
+    const label = asOptionalString(value.goal.label)
+    if (label && Number.isFinite(target) && target > 0) {
+      goal = {
+        label,
+        target,
+        unit: asOptionalString(value.goal.unit),
+        deadline: asOptionalString(value.goal.deadline),
+      }
+    }
+  }
+
+  return {
+    name: asString(value.name, 'proposal.name').slice(0, 48),
+    description: asString(value.description, 'proposal.description').slice(0, 180),
+    kind: kind as ModelProposal['kind'],
+    icon,
+    color,
+    rationale: asStringList(value.rationale, 'proposal.rationale', 2, 3),
+    fields,
+    goal,
+  }
+}
+
+function validateField(value: unknown, index: number): ModelField {
+  if (!isRecord(value)) throw new ValidationError(`fields[${index}] no es un objeto.`)
+  const type = asString(value.type, `fields[${index}].type`)
+  if (!FIELD_TYPES.has(type)) {
+    throw new ValidationError(`fields[${index}].type inválido: ${type}`)
+  }
+
+  let options: ModelField['options']
+  if (type === 'select') {
+    if (!Array.isArray(value.options) || value.options.length < 2 || value.options.length > 8) {
+      throw new ValidationError(`fields[${index}].options debe tener 2 a 8 opciones.`)
+    }
+    options = value.options.map((option, optionIndex) => {
+      if (!isRecord(option)) {
+        throw new ValidationError(`fields[${index}].options[${optionIndex}] inválido.`)
+      }
+      return {
+        value: asString(option.value, `fields[${index}].options[${optionIndex}].value`),
+        label: asString(option.label, `fields[${index}].options[${optionIndex}].label`),
+      }
+    })
+  }
+
+  const roleRaw = asOptionalString(value.role)
+  const role = roleRaw && FIELD_ROLES.has(roleRaw) ? (roleRaw as ModelField['role']) : undefined
+  const unit = asOptionalString(value.unit)
+
+  return {
+    key: asString(value.key ?? value.label, `fields[${index}].key`)
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9]+/g, '_')
+      .replace(/^_|_$/g, '')
+      .slice(0, 32) || `campo_${index + 1}`,
+    label: asString(value.label, `fields[${index}].label`).slice(0, 40),
+    type: type as ModelField['type'],
+    role,
+    unit,
+    required: value.required === true,
+    options,
+    placeholder: asOptionalString(value.placeholder),
+  }
+}
+
+export interface ProgressAnalysis {
+  resumen: string
+  fortalezas: string[]
+  riesgos: string[]
+  recomendacion: string
+}
+
+export function validateAnalysis(value: unknown): ProgressAnalysis {
+  if (!isRecord(value)) throw new ValidationError('La respuesta del modelo no es un objeto.')
+  return {
+    resumen: asString(value.resumen, 'resumen').slice(0, 400),
+    fortalezas: asStringList(value.fortalezas, 'fortalezas', 1, 3),
+    riesgos: asStringList(value.riesgos, 'riesgos', 1, 3),
+    recomendacion: asString(value.recomendacion, 'recomendacion').slice(0, 320),
+  }
+}
+
+export interface CaptureFieldDef {
+  key: string
+  label: string
+  type: string
+  role?: string
+  unit?: string
+  options?: { value: string; label: string }[]
+}
+
+export interface CaptureRecordSummary {
+  id: string
+  title: string
+  status?: string
+}
+
+export type ModelCapture =
+  | { kind: 'new_record'; values: Record<string, string | number | boolean> }
+  | { kind: 'update_record'; recordId: string; values: Record<string, string | number | boolean> }
+  | { kind: 'needs_disambiguation'; question: string; candidates: { id: string; title: string }[] }
+  | { kind: 'needs_clarification'; question: string }
+
+function coerceCaptureValue(
+  field: CaptureFieldDef,
+  raw: unknown,
+): string | number | boolean | undefined {
+  if (raw === null || raw === undefined || raw === '') return undefined
+
+  if (field.type === 'boolean') {
+    if (typeof raw === 'boolean') return raw
+    if (typeof raw === 'string') {
+      const text = raw.trim().toLowerCase()
+      if (['true', 'si', 'sí', 'yes', '1'].includes(text)) return true
+      if (['false', 'no', '0'].includes(text)) return false
+    }
+    throw new ValidationError(`Valor inválido para ${field.key}.`)
+  }
+
+  if (field.type === 'number') {
+    const number = typeof raw === 'number' ? raw : Number(String(raw).replace(',', '.'))
+    if (!Number.isFinite(number)) throw new ValidationError(`"${field.key}" debe ser un número.`)
+    return number
+  }
+
+  if (field.type === 'date') {
+    const text = String(raw).trim()
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(text)) {
+      throw new ValidationError(`"${field.key}" debe ser una fecha YYYY-MM-DD.`)
+    }
+    return text
+  }
+
+  const text = String(raw).trim()
+  if (!text) return undefined
+
+  if (field.type === 'select' && field.options?.length) {
+    const match = field.options.find(
+      (option) =>
+        option.value.toLowerCase() === text.toLowerCase() ||
+        option.label.toLowerCase() === text.toLowerCase(),
+    )
+    if (!match) throw new ValidationError(`"${field.key}" no coincide con una opción válida.`)
+    return match.value
+  }
+
+  return text
+}
+
+export function coerceCaptureValues(
+  fields: CaptureFieldDef[],
+  raw: unknown,
+): Record<string, string | number | boolean> {
+  if (!isRecord(raw)) throw new ValidationError('values debe ser un objeto.')
+  const values: Record<string, string | number | boolean> = {}
+  for (const field of fields) {
+    if (!(field.key in raw)) continue
+    const coerced = coerceCaptureValue(field, raw[field.key])
+    if (coerced !== undefined) values[field.key] = coerced
+  }
+  if (Object.keys(values).length === 0) {
+    throw new ValidationError('El modelo no extrajo ningún campo válido del texto.')
+  }
+  return values
+}
+
+export function validateCapture(
+  value: unknown,
+  fields: CaptureFieldDef[],
+  records: CaptureRecordSummary[],
+): ModelCapture {
+  if (!isRecord(value)) throw new ValidationError('La respuesta del modelo no es un objeto.')
+  const kind = value.kind
+  const ids = new Set(records.map((record) => record.id))
+
+  if (kind === 'needs_clarification') {
+    return { kind: 'needs_clarification', question: asString(value.question, 'question') }
+  }
+
+  if (kind === 'needs_disambiguation') {
+    if (!Array.isArray(value.candidates) || value.candidates.length < 2) {
+      throw new ValidationError('needs_disambiguation requiere al menos 2 candidatos.')
+    }
+    const candidates = value.candidates
+      .map((candidate, index) => {
+        if (!isRecord(candidate)) {
+          throw new ValidationError(`candidates[${index}] inválido.`)
+        }
+        return {
+          id: asString(candidate.id, `candidates[${index}].id`),
+          title: asString(candidate.title, `candidates[${index}].title`),
+        }
+      })
+      .filter((candidate) => ids.has(candidate.id))
+      .slice(0, 6)
+    if (candidates.length < 2) {
+      throw new ValidationError('Los candidatos no coinciden con registros existentes.')
+    }
+    return {
+      kind: 'needs_disambiguation',
+      question: asString(value.question ?? '¿A cuál registro te refieres?', 'question'),
+      candidates,
+    }
+  }
+
+  if (kind === 'new_record') {
+    return { kind: 'new_record', values: coerceCaptureValues(fields, value.values) }
+  }
+
+  if (kind === 'update_record') {
+    const recordId = asString(value.recordId, 'recordId')
+    if (!ids.has(recordId)) {
+      throw new ValidationError('recordId no coincide con un registro existente.')
+    }
+    return {
+      kind: 'update_record',
+      recordId,
+      values: coerceCaptureValues(fields, value.values),
+    }
+  }
+
+  throw new ValidationError(
+    'kind debe ser new_record, update_record, needs_disambiguation o needs_clarification.',
+  )
+}
