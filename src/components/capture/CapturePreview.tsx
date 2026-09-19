@@ -1,11 +1,13 @@
 import type { Field, FieldValue, RecordItem, Workspace } from '../../domain/types'
 import type { CaptureResult } from '../../lib/captureDialogue'
 import { formatDate } from '../../lib/dates'
+import { formatAmount } from '../../lib/format'
 
 export function formatCaptureValue(field: Field, value: FieldValue) {
   if (value === null || value === undefined || value === '') return '—'
   if (field.type === 'boolean') return value ? 'Sí' : 'No'
   if (field.type === 'date') return formatDate(value)
+  if (field.role === 'amount' && typeof value === 'number') return formatAmount(value, field.unit)
   return String(value)
 }
 

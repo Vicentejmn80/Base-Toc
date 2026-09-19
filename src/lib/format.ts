@@ -19,13 +19,39 @@ const MONEY_UNITS: Record<string, string> = {
   euro: '€',
   euros: '€',
   '€': '€',
+  ves: 'Bs',
+  bs: 'Bs',
+  bolivar: 'Bs',
+  bolivares: 'Bs',
+  bolívares: 'Bs',
+  usdt: 'USDT',
+}
+
+function unitKey(raw: string) {
+  return raw.trim().toLowerCase().replace(/[^a-z0-9/$€]/g, '')
+}
+
+export function amountUnitFromCurrency(code?: string) {
+  if (!code) return undefined
+  const raw = code.trim()
+  if (!raw) return undefined
+  const mapped = MONEY_UNITS[unitKey(raw)] ?? MONEY_UNITS[raw.toLowerCase()]
+  if (mapped) return mapped
+  return raw.toUpperCase()
+}
+
+export function isMoneyUnit(unit?: string) {
+  if (!unit) return false
+  const key = unitKey(unit)
+  if (MONEY_UNITS[key]) return true
+  return /^[A-Z]{3,5}$/.test(unit.trim()) && !/^(KM|MIN)$/.test(unit.trim())
 }
 
 export function formatAmount(value: number, unit?: string) {
   const raw = (unit ?? '').trim()
   if (!raw) return formatNumber(value, Number.isInteger(value) ? 0 : 1)
 
-  const mapped = MONEY_UNITS[raw.toLowerCase()] ?? MONEY_UNITS[raw]
+  const mapped = MONEY_UNITS[unitKey(raw)] ?? MONEY_UNITS[raw.toLowerCase()] ?? MONEY_UNITS[raw]
   if (mapped) {
     const digits = Math.abs(value) >= 100 || Number.isInteger(value) ? 0 : 2
     return `${mapped} ${formatNumber(value, digits)}`

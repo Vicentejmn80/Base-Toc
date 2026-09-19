@@ -189,7 +189,7 @@ function Cell({ field, value }: { field: Field; value: FieldValue }) {
   if (field.type === 'boolean') return <Badge>{value ? 'Sí' : 'No'}</Badge>
   if (field.type === 'date') return <span>{formatDate(value)}</span>
   if (field.type === 'number') {
-    if (field.role === 'amount') return <span>{formatAmount(Number(value), field.unit)}</span>
+    if (field.role === 'amount') return <span data-testid="amount-cell">{formatAmount(Number(value), field.unit)}</span>
     return <span>{formatNumber(Number(value), Number.isInteger(value) ? 0 : 1)}</span>
   }
   return <span>{String(value)}</span>

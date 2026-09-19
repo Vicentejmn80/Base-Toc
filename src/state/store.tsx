@@ -88,7 +88,11 @@ function reducer(state: AppState, action: Action): AppState {
         ...state,
         workspaces: state.workspaces.map((workspace) =>
           workspace.id === action.workspaceId
-            ? { ...workspace, finance: action.book, updatedAt: new Date().toISOString() }
+            ? migrateWorkspaceFields({
+                ...workspace,
+                finance: action.book,
+                updatedAt: new Date().toISOString(),
+              })
             : workspace,
         ),
         activities: [activityFrom(action.workspaceId, 'record_created', action.message), ...state.activities],

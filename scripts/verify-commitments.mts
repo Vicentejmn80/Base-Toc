@@ -1,5 +1,5 @@
-import { interpretCommitment, leftoverAfterCommitments, parseDueDate, suggestWorkspaceId } from '../src/lib/commitment'
-import type { Workspace } from '../src/domain/types'
+import { interpretCommitment, leftoverAfterCommitments, parseDueDate, suggestWorkspaceId, groupPendingCommitments } from '../src/lib/commitment'
+import type { Commitment, Workspace } from '../src/domain/types'
 
 const today = new Date('2026-09-19T12:00:00')
 
@@ -51,5 +51,20 @@ assert(suggestWorkspaceId('quiz de matemática', workspaces) === undefined, 'qui
 const past = interpretCommitment('Hoy corrí 10 km', workspaces, today)
 assert(past.kind === 'unparsed', 'past run is not a commitment')
 console.log('ok  past event is not a commitment')
+
+const grouped = groupPendingCommitments(
+  [
+    { id: 'a', description: 'Ayer', dueDate: '2026-09-18', status: 'pendiente', createdAt: '' },
+    { id: 'b', description: 'Hoy', dueDate: '2026-09-19', status: 'pendiente', createdAt: '' },
+    { id: 'c', description: 'Mañana gym', dueDate: '2026-09-20', status: 'pendiente', createdAt: '' },
+    { id: 'd', description: 'Lejos', dueDate: '2026-10-20', status: 'pendiente', createdAt: '' },
+    { id: 'e', description: 'Hecho', dueDate: '2026-09-19', status: 'cumplido', createdAt: '' },
+  ] as Commitment[],
+  today,
+)
+assert(grouped.overdue.map((item) => item.id).join() === 'a', 'overdue')
+assert(grouped.today.map((item) => item.id).join() === 'b', 'today')
+assert(grouped.upcoming.map((item) => item.id).join() === 'c', 'upcoming next 7 days')
+console.log('ok  overdue / today / upcoming buckets')
 
 console.log('\nall commitment cases passed')

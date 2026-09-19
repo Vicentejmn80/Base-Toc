@@ -242,6 +242,19 @@ export function isDueTodayOrOverdue(commitment: Commitment, today = new Date()) 
   return commitment.dueDate <= toIsoDate(today)
 }
 
+export function groupPendingCommitments(commitments: Commitment[], today = new Date()) {
+  const todayIso = toIsoDate(today)
+  const upcomingLimit = toIsoDate(addDays(today, 7))
+  const pending = commitments.filter((item) => item.status === 'pendiente')
+  return {
+    overdue: pending.filter((item) => item.dueDate < todayIso).sort((a, b) => a.dueDate.localeCompare(b.dueDate)),
+    today: pending.filter((item) => item.dueDate === todayIso),
+    upcoming: pending
+      .filter((item) => item.dueDate > todayIso && item.dueDate <= upcomingLimit)
+      .sort((a, b) => a.dueDate.localeCompare(b.dueDate)),
+  }
+}
+
 export function happenedMessage(description: string) {
   return `Ya lo hice: ${description}`
 }

@@ -4,6 +4,7 @@ import { humanizeActivity } from '../../lib/humanizeActivity'
 import { mobilePeriodLabel } from '../../lib/periodCopy'
 import { buildProgressObservations, buildAreaProgress } from '../../metrics/progress'
 import { projectGoal } from '../../metrics/goals'
+import { ActivityHeatmap } from '../progress/ActivityHeatmap'
 import { ProgressCompare } from '../progress/ProgressCompare'
 import { ProgressInsight } from '../progress/ProgressInsight'
 import { Sparkline } from '../progress/Sparkline'
@@ -42,6 +43,8 @@ export function MobileProgressFeed({
         <ProgressCompare area={area} size="lg" />
         <Sparkline values={area.history} className="text-slate-400" />
       </div>
+
+      <ActivityHeatmap workspace={workspace} />
 
       <ProgressInsight observation={observations} />
 

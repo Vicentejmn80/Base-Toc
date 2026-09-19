@@ -18,6 +18,7 @@ import { ProactiveInsights } from '../dashboard/ProactiveInsights'
 import { ChartsPanel } from '../dashboard/ChartsPanel'
 import { FollowUps } from '../dashboard/FollowUps'
 import { ActivityFeed } from '../dashboard/ActivityFeed'
+import { ActivityHeatmap } from '../progress/ActivityHeatmap'
 import { WorkspaceComposer } from './WorkspaceComposer'
 import { CaptureLauncher, CaptureSheet } from './CaptureSheet'
 import { FinanceOnboarding } from '../finance/FinanceOnboarding'
@@ -396,6 +397,7 @@ export function WorkspacePage() {
         <div className="space-y-8">
           {financeBody}
           <NarrativeSummary workspace={workspace} period={period} />
+          <ActivityHeatmap workspace={workspace} />
           <GoalCard
             workspace={workspace}
             goal={workspace.goals[0] ?? null}

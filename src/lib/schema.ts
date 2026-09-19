@@ -1,5 +1,6 @@
 import type { Field, FieldRole, FieldValue, RecordItem, Workspace } from '../domain/types'
 import { ensureFinanceBook } from '../finance/domain/book'
+import { amountUnitFromCurrency, isMoneyUnit } from './format'
 
 export interface WorkspaceSchema {
   identifier?: Field
@@ -49,11 +50,34 @@ function looksLikeFollowUp(field: Field) {
   return /seguim|vence|follow|due|proximo/.test(normalize(blob))
 }
 
+function financeAmountField(workspace: Workspace) {
+  const amount = fieldByRole(workspace, 'amount')
+  if (!amount || workspace.kind !== 'finance') return amount
+  const unit = amountUnitFromCurrency(workspace.finance?.setup.displayCurrency)
+  if (!unit || amount.unit === unit) return amount
+  return { ...amount, unit }
+}
+
+export function syncFinanceAmountUnit(workspace: Workspace): Workspace {
+  if (workspace.kind !== 'finance') return workspace
+  const unit = amountUnitFromCurrency(workspace.finance?.setup.displayCurrency)
+  if (!unit) return workspace
+
+  const fields = workspace.fields.map((field) =>
+    field.role === 'amount' && field.unit !== unit ? { ...field, unit } : field,
+  )
+  const goals = workspace.goals.map((goal) => {
+    if (!goal.unit || isMoneyUnit(goal.unit)) return { ...goal, unit }
+    return goal
+  })
+  return { ...workspace, fields, goals }
+}
+
 export function readSchema(workspace: Workspace): WorkspaceSchema {
   const identifier = fieldByRole(workspace, 'identifier')
   const status = fieldByRole(workspace, 'status')
   const categories = fieldsByRole(workspace, 'category')
-  const amount = fieldByRole(workspace, 'amount')
+  const amount = financeAmountField(workspace)
   const dateFields = fieldsByRole(workspace, 'date')
   const date =
     dateFields.find((field) => !looksLikeFollowUp(field)) ?? dateFields[0]
@@ -202,7 +226,7 @@ export function migrateWorkspaceFields(workspace: Workspace): Workspace {
   }
 
   if (next.kind === 'finance') {
-    return { ...next, finance: ensureFinanceBook(next.finance) }
+    next = syncFinanceAmountUnit({ ...next, finance: ensureFinanceBook(next.finance) })
   }
   return next
 }

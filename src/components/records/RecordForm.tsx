@@ -86,6 +86,9 @@ export function RecordForm({ workspace, record, onCancel, onSave }: RecordFormPr
           <label key={field.id} className={field.type === 'longText' ? 'sm:col-span-2' : undefined}>
             <span className="mb-1.5 block text-sm font-medium">
               {field.label}
+              {field.role === 'amount' && field.unit ? (
+                <span data-testid="amount-unit"> ({field.unit})</span>
+              ) : null}
               {field.required ? <span className="text-danger"> *</span> : null}
             </span>
             <FieldControl field={field} value={values[field.key]} onChange={(value) => update(field.key, value)} />

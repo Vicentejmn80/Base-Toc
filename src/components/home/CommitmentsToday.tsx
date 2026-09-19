@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import type { Commitment, FieldValue, RecordItem, Workspace } from '../../domain/types'
 import { AiRequestError } from '../../lib/aiClient'
 import {
@@ -12,8 +12,8 @@ import { mergeCaptureValues, requestCapture, type CaptureResult } from '../../li
 import {
   draftValuesFromCommitment,
   dueLabel,
+  groupPendingCommitments,
   happenedMessage,
-  isDueTodayOrOverdue,
   parseDueDate,
 } from '../../lib/commitment'
 import { useAppStore } from '../../state/store'
@@ -23,24 +23,83 @@ import { Modal } from '../ui/Modal'
 
 export function CommitmentsToday({ workspaces }: { workspaces: Workspace[] }) {
   const { commitments, saveRecord, patchCommitment } = useAppStore()
-  const due = commitments.filter((item) => isDueTodayOrOverdue(item))
-  if (!due.length) return null
+  const groups = groupPendingCommitments(commitments)
+  if (!groups.overdue.length && !groups.today.length && !groups.upcoming.length) return null
 
   return (
-    <section className="space-y-4" data-testid="commitments-today">
-      <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">Compromisos de hoy</p>
-      <div className="space-y-3">
-        {due.map((commitment) => (
-          <CommitmentCard
-            key={commitment.id}
-            commitment={commitment}
-            workspaces={workspaces}
-            onSaveRecord={saveRecord}
-            onPatch={patchCommitment}
-          />
-        ))}
-      </div>
+    <section className="space-y-8" data-testid="commitments-home">
+      {groups.overdue.length ? (
+        <CommitmentGroup title="Vencidos" testId="commitments-overdue">
+          {groups.overdue.map((commitment) => (
+            <CommitmentCard
+              key={commitment.id}
+              commitment={commitment}
+              workspaces={workspaces}
+              onSaveRecord={saveRecord}
+              onPatch={patchCommitment}
+            />
+          ))}
+        </CommitmentGroup>
+      ) : null}
+
+      {groups.today.length ? (
+        <CommitmentGroup title="Hoy" testId="commitments-today">
+          {groups.today.map((commitment) => (
+            <CommitmentCard
+              key={commitment.id}
+              commitment={commitment}
+              workspaces={workspaces}
+              onSaveRecord={saveRecord}
+              onPatch={patchCommitment}
+            />
+          ))}
+        </CommitmentGroup>
+      ) : null}
+
+      {groups.upcoming.length ? (
+        <CommitmentGroup title="Próximos" testId="commitments-upcoming">
+          {groups.upcoming.map((commitment) => (
+            <UpcomingCard key={commitment.id} commitment={commitment} workspaces={workspaces} />
+          ))}
+        </CommitmentGroup>
+      ) : null}
     </section>
+  )
+}
+
+function CommitmentGroup({
+  title,
+  testId,
+  children,
+}: {
+  title: string
+  testId: string
+  children: ReactNode
+}) {
+  return (
+    <div className="space-y-3" data-testid={testId}>
+      <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">{title}</p>
+      <div className="space-y-3">{children}</div>
+    </div>
+  )
+}
+
+function UpcomingCard({
+  commitment,
+  workspaces,
+}: {
+  commitment: Commitment
+  workspaces: Workspace[]
+}) {
+  const space = workspaces.find((item) => item.id === commitment.suggestedWorkspaceId)
+  return (
+    <div className="rounded-3xl border border-line bg-white px-4 py-3" data-testid="commitment-upcoming">
+      <p className="text-[15px] leading-6 text-ink">{commitment.description}</p>
+      <p className="mt-1 text-sm text-muted">
+        {dueLabel(commitment.dueDate)}
+        {space ? ` · ${space.name}` : ''}
+      </p>
+    </div>
   )
 }
 

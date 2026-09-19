@@ -15,6 +15,7 @@ const ALIASES: Record<string, string> = {
   pound: 'GBP',
   pounds: 'GBP',
   ves: 'VES',
+  bs: 'VES',
   bolivar: 'VES',
   bolívares: 'VES',
   bolivares: 'VES',
