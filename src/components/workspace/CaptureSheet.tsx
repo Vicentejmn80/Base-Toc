@@ -22,7 +22,9 @@ import { useToast } from '../../state/toast'
 import { captureExample } from '../../lib/schema'
 import { CapturePreview } from '../capture/CapturePreview'
 import { ReentryBanner } from '../capture/ReentryBanner'
+import { SaveReward } from '../capture/SaveReward'
 import { needsReentry } from '../../metrics/coverage'
+import { buildSaveInsight } from '../../metrics/saveInsight'
 
 interface CaptureSheetProps {
   open: boolean
@@ -53,6 +55,7 @@ export function CaptureSheet({ open, workspace, onClose, onOpenForm, onConfirm }
   const [history, setHistory] = useState<HistoryTurn[]>([])
   const [correcting, setCorrecting] = useState(false)
   const [correction, setCorrection] = useState('')
+  const [reward, setReward] = useState<string | null>(null)
   const lastAttempt = useRef<{
     message: string
     selectedRecordId?: string
@@ -74,6 +77,7 @@ export function CaptureSheet({ open, workspace, onClose, onOpenForm, onConfirm }
     setHistory([])
     setCorrecting(false)
     setCorrection('')
+    setReward(null)
     lastAttempt.current = null
   }
 
@@ -148,8 +152,16 @@ export function CaptureSheet({ open, workspace, onClose, onOpenForm, onConfirm }
       showToast(plain ? 'Eso ya no está en el espacio.' : 'Ese registro ya no está en el espacio.', 'danger')
       return
     }
-    onConfirm(mergeCaptureValues(workspace, result.values, existing), existing)
-    reset()
+    const values = mergeCaptureValues(workspace, result.values, existing)
+    const insight = buildSaveInsight({ workspace, values, existing })
+    onConfirm(values, existing)
+    setReward(insight.text)
+    setResult(null)
+    setCorrecting(false)
+    setCorrection('')
+    setPrompt('')
+    setStatus('idle')
+    setError(null)
   }
 
   const existing =
@@ -157,8 +169,9 @@ export function CaptureSheet({ open, workspace, onClose, onOpenForm, onConfirm }
       ? workspace.records.find((record) => record.id === result.recordId)
       : undefined
 
-  const title =
-    result?.kind === 'new_record' || result?.kind === 'update_record'
+  const title = reward
+    ? workspace.name
+    : result?.kind === 'new_record' || result?.kind === 'update_record'
       ? captureHeadline(
           result.kind,
           workspace.name,
@@ -175,14 +188,17 @@ export function CaptureSheet({ open, workspace, onClose, onOpenForm, onConfirm }
       wide
       title={title}
       description={
-        plain
-          ? 'Dímelo como quieras. Revisa que lo entendí bien antes de anotarlo.'
-          : 'Cuéntame qué pasó. Confirma los campos antes de guardar.'
+        reward
+          ? undefined
+          : plain
+            ? 'Dímelo como quieras. Revisa que lo entendí bien antes de anotarlo.'
+            : 'Cuéntame qué pasó. Confirma los campos antes de guardar.'
       }
       onClose={close}
     >
       <div className="space-y-4">
-        {needsReentry(workspace) &&
+        {reward ? <SaveReward text={reward} onDone={close} /> : null}
+        {!reward && needsReentry(workspace) &&
         result?.kind !== 'new_record' &&
         result?.kind !== 'update_record' ? (
           <ReentryBanner compact />
@@ -289,7 +305,8 @@ export function CaptureSheet({ open, workspace, onClose, onOpenForm, onConfirm }
           </div>
         ) : null}
 
-        {!correcting &&
+        {!reward &&
+        !correcting &&
         result?.kind !== 'new_record' &&
         result?.kind !== 'update_record' &&
         result?.kind !== 'needs_disambiguation' ? (
@@ -316,19 +333,21 @@ export function CaptureSheet({ open, workspace, onClose, onOpenForm, onConfirm }
           </p>
         ) : null}
 
-        <button
-          type="button"
-          className="text-sm text-muted underline-offset-2 hover:text-ink hover:underline"
-          onClick={() => {
-            close()
-            onOpenForm()
-          }}
-        >
-          {plain ? 'Prefiero llenarlo yo' : 'Llenar formulario manualmente'}
-        </button>
+        {!reward ? (
+          <button
+            type="button"
+            className="text-sm text-muted underline-offset-2 hover:text-ink hover:underline"
+            onClick={() => {
+              close()
+              onOpenForm()
+            }}
+          >
+            {plain ? 'Prefiero llenarlo yo' : 'Llenar formulario manualmente'}
+          </button>
+        ) : null}
       </div>
 
-      {result?.kind === 'new_record' || result?.kind === 'update_record' ? (
+      {!reward && (result?.kind === 'new_record' || result?.kind === 'update_record') ? (
         <div className="mt-6 flex flex-wrap justify-end gap-2">
           <Button variant="secondary" onClick={close}>
             Cancelar
@@ -340,13 +359,7 @@ export function CaptureSheet({ open, workspace, onClose, onOpenForm, onConfirm }
             {captureConfirmLabel(plain)}
           </Button>
         </div>
-      ) : (
-        <div className="mt-6 flex justify-end">
-          <Button variant="secondary" onClick={close}>
-            Cerrar
-          </Button>
-        </div>
-      )}
+      ) : null}
     </Modal>
   )
 }

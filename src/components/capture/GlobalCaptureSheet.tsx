@@ -6,7 +6,6 @@ import {
   captureConfirmLabel,
   captureHeadline,
   captureLoadingCopy,
-  captureSavedToast,
   humanAiError,
   usePlainLanguage,
 } from '../../lib/captureCopy'
@@ -32,6 +31,8 @@ import { Button } from '../ui/Button'
 import { Modal } from '../ui/Modal'
 import { CapturePreview } from './CapturePreview'
 import { AiWorkingState } from './AiWorkingState'
+import { SaveReward } from './SaveReward'
+import { buildConsolidatedSaveInsight, buildSaveInsight } from '../../metrics/saveInsight'
 
 type Status = 'idle' | 'loading' | 'error'
 type HistoryTurn = { role: 'user' | 'assistant'; content: string }
@@ -42,6 +43,7 @@ interface IntentState {
   workspaceName: string
   capture: CaptureResult
   status: 'pending' | 'saved' | 'dismissed'
+  insight?: string
 }
 
 interface GlobalCaptureSheetProps {
@@ -68,6 +70,7 @@ export function GlobalCaptureSheet({ open, seed, onClose }: GlobalCaptureSheetPr
   const [creationError, setCreationError] = useState<string | null>(null)
   const [dialogueState, setDialogueState] = useState<CreationDialogueState>(emptyDialogueState)
   const [heard, setHeard] = useState<string | null>(null)
+  const [batchReward, setBatchReward] = useState<string | null>(null)
   const lastAttempt = useRef<string | null>(null)
   const abortRef = useRef<AbortController | null>(null)
 
@@ -87,6 +90,7 @@ export function GlobalCaptureSheet({ open, seed, onClose }: GlobalCaptureSheetPr
     setCreationError(null)
     setDialogueState(emptyDialogueState())
     setHeard(null)
+    setBatchReward(null)
     lastAttempt.current = null
   }
 
@@ -229,7 +233,7 @@ export function GlobalCaptureSheet({ open, seed, onClose }: GlobalCaptureSheetPr
     }
   }
 
-  function confirmIntent(intent: IntentState, options?: { silent?: boolean }) {
+  function confirmIntent(intent: IntentState) {
     const capture = intent.capture
     if (capture.kind !== 'new_record' && capture.kind !== 'update_record') return
     const workspace = workspaces.find((item) => item.id === intent.workspaceId)
@@ -245,13 +249,14 @@ export function GlobalCaptureSheet({ open, seed, onClose }: GlobalCaptureSheetPr
       showToast(plain ? 'Eso ya no está en el espacio.' : 'Ese registro ya no está en el espacio.', 'danger')
       return
     }
-    saveRecord(workspace.id, mergeCaptureValues(workspace, capture.values, existing), existing)
+    const values = mergeCaptureValues(workspace, capture.values, existing)
+    const insight = buildSaveInsight({ workspace, values, existing })
+    saveRecord(workspace.id, values, existing)
     setIntents((current) =>
-      current.map((item) => (item.id === intent.id ? { ...item, status: 'saved' } : item)),
+      current.map((item) =>
+        item.id === intent.id ? { ...item, status: 'saved', insight: insight.text } : item,
+      ),
     )
-    if (!options?.silent) {
-      showToast(captureSavedToast(workspace.name, Boolean(existing), plain), 'success')
-    }
   }
 
   function confirmAll() {
@@ -260,13 +265,51 @@ export function GlobalCaptureSheet({ open, seed, onClose }: GlobalCaptureSheetPr
         intent.status === 'pending' &&
         (intent.capture.kind === 'new_record' || intent.capture.kind === 'update_record'),
     )
-    ready.forEach((intent) => confirmIntent(intent, { silent: true }))
-    if (ready.length) {
-      showToast(
-        plain ? `Listo, anoté ${ready.length === 1 ? 'eso' : `las ${ready.length} cosas`}` : 'Cambios guardados',
-        'success',
+    let currentSpaces = workspaces
+    const insights = ready.map((intent) => {
+      const capture = intent.capture
+      const workspace = currentSpaces.find((item) => item.id === intent.workspaceId)
+      if (!workspace || (capture.kind !== 'new_record' && capture.kind !== 'update_record')) {
+        return { intent, insight: null as ReturnType<typeof buildSaveInsight> | null }
+      }
+      const existing =
+        capture.kind === 'update_record'
+          ? workspace.records.find((record) => record.id === capture.recordId)
+          : undefined
+      const values = mergeCaptureValues(workspace, capture.values, existing)
+      const insight = buildSaveInsight({ workspace, values, existing })
+      saveRecord(workspace.id, values, existing)
+      const incoming = {
+        id: existing?.id ?? `__pending_${intent.id}`,
+        workspaceId: workspace.id,
+        values,
+        createdAt: existing?.createdAt ?? new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      }
+      currentSpaces = currentSpaces.map((item) =>
+        item.id !== workspace.id
+          ? item
+          : {
+              ...item,
+              records: existing
+                ? item.records.map((record) => (record.id === existing.id ? incoming : record))
+                : [...item.records, incoming],
+            },
       )
-    }
+      return { intent, insight }
+    })
+    setIntents((current) =>
+      current.map((item) => {
+        const match = insights.find((entry) => entry.intent.id === item.id)
+        return match?.insight
+          ? { ...item, status: 'saved' as const, insight: match.insight.text }
+          : item
+      }),
+    )
+    const built = insights
+      .map((entry) => entry.insight)
+      .filter((item): item is NonNullable<typeof item> => Boolean(item))
+    if (built.length) setBatchReward(buildConsolidatedSaveInsight(built).text)
   }
 
   async function startCreateSpace(seedText: string) {
@@ -317,6 +360,7 @@ export function GlobalCaptureSheet({ open, seed, onClose }: GlobalCaptureSheetPr
     status !== 'loading' &&
     creationStatus !== 'loading' &&
     !busyIntentId &&
+    !batchReward &&
     (Boolean(globalQuestion) || (!hasConfirmable && !hasIntentFollowup))
 
   const confirmable = pendingIntents.filter(
@@ -331,6 +375,8 @@ export function GlobalCaptureSheet({ open, seed, onClose }: GlobalCaptureSheetPr
     <>
       <Modal open={open} wide title={title} description={description} onClose={close}>
         <div className="space-y-4" data-testid="global-capture-sheet">
+          {batchReward ? <SaveReward text={batchReward} /> : null}
+
           {heard ? (
             <div className="rounded-2xl border border-line bg-canvas px-4 py-3">
               <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">
@@ -518,9 +564,10 @@ function IntentCard({
   if (intent.status === 'dismissed') return null
   if (intent.status === 'saved') {
     return (
-      <div className="rounded-2xl border border-emerald-100 bg-success-soft px-4 py-3 text-sm text-success">
-        {plain ? `Listo, lo anoté en ${intent.workspaceName}.` : `Guardado en ${intent.workspaceName}.`}
-      </div>
+      <SaveReward
+        compact
+        text={intent.insight ?? (plain ? `Listo, lo anoté en ${intent.workspaceName}.` : `Guardado en ${intent.workspaceName}.`)}
+      />
     )
   }
 

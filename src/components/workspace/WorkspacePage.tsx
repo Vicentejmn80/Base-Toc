@@ -27,7 +27,6 @@ import { computeMetrics } from '../../metrics'
 import { isWithinPeriod, type PeriodKey } from '../../lib/dates'
 import type { Goal, RecordItem } from '../../domain/types'
 import { recordTitle } from '../../lib/records'
-import { captureSavedToast } from '../../lib/captureCopy'
 import { cn } from '../../lib/cn'
 import { createId } from '../../lib/id'
 import { fieldByRole } from '../../lib/schema'
@@ -479,8 +478,6 @@ export function WorkspacePage() {
         onOpenForm={openCreate}
         onConfirm={(values, existing) => {
           saveRecord(workspace.id, values, existing)
-          setCaptureOpen(false)
-          showToast(captureSavedToast(workspace.name, Boolean(existing), isMobile), 'success')
         }}
       />
 
