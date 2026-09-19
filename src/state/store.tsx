@@ -22,6 +22,7 @@ import { localStorageAdapter } from '../persistence/storage'
 import { createId } from '../lib/id'
 import { recordTitle } from '../lib/records'
 import { migrateWorkspaceFields, readSchema } from '../lib/schema'
+import { emitValueMoment } from '../push/events'
 
 interface AppState {
   hydrated: boolean
@@ -305,6 +306,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
 
   const saveCommitment = useCallback((commitment: Commitment) => {
     dispatch({ type: 'upsert_commitment', commitment })
+    emitValueMoment('commitment')
   }, [])
 
   const patchCommitment = useCallback((id: string, patch: Partial<Commitment>) => {

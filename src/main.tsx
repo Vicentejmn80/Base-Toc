@@ -6,6 +6,7 @@ import { AppStoreProvider } from './state/store'
 import { ToastProvider } from './state/toast'
 import { InstallProvider } from './pwa/install'
 import { GlobalCaptureProvider } from './state/globalCapture'
+import { PushProvider } from './push/PushProvider'
 import { registerServiceWorker } from './pwa/register'
 import './index.css'
 
@@ -18,7 +19,9 @@ createRoot(document.getElementById('root')!).render(
         <ToastProvider>
           <InstallProvider>
             <GlobalCaptureProvider>
-              <App />
+              <PushProvider>
+                <App />
+              </PushProvider>
             </GlobalCaptureProvider>
           </InstallProvider>
         </ToastProvider>

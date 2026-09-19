@@ -10,3 +10,4 @@ dist-ssr
 *.tsbuildinfo
 .cursor-*
 !.cursor/rules/
+.data/

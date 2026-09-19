@@ -1,4 +1,5 @@
 import { useInstallPrompt } from '../pwa/install'
+import { PushSettings } from '../push/PushSettings'
 
 export function MorePage() {
   const { canInstall, iosHint, install } = useInstallPrompt()
@@ -37,6 +38,8 @@ export function MorePage() {
           </p>
         )}
       </section>
+
+      <PushSettings />
 
       <section className="rounded-3xl border border-line bg-white p-4 shadow-[var(--shadow-card)]">
         <p className="text-sm font-semibold text-ink">Datos</p>

@@ -9,10 +9,20 @@ import { handleCaptureGlobal } from './handlers/captureGlobal.js'
 import { handleCreation } from './handlers/creation.js'
 import { handleTranscribe } from './handlers/transcribe.js'
 import { errorMessage, errorStatus } from './handlers/http.js'
+import {
+  handleCronPush,
+  handlePushConfig,
+  handlePushInbox,
+  handlePushOpened,
+  handlePushSettings,
+  handlePushSubscribe,
+  handlePushSync,
+} from './push/handlers.js'
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 dotenv.config({ path: path.join(root, '.env.local') })
 dotenv.config({ path: path.join(root, '.env') })
+// Push endpoints read VAPID_* and CRON_SECRET from those files.
 
 const app = express()
 const port = Number(process.env.PORT) || 8787
@@ -64,6 +74,58 @@ app.post('/api/ai/analyze', (req, res) => {
 
 app.post('/api/ai/transcribe', (req, res) => {
   void sendJson(res, handleTranscribe, req.body)
+})
+
+app.get('/api/push/config', (_req, res) => {
+  void sendJson(res, handlePushConfig, {})
+})
+
+app.post('/api/push/subscribe', (req, res) => {
+  void sendJson(res, handlePushSubscribe, req.body)
+})
+
+app.post('/api/push/sync', (req, res) => {
+  void sendJson(res, handlePushSync, req.body)
+})
+
+app.get('/api/push/inbox', (req, res) => {
+  const deviceId = typeof req.query.deviceId === 'string' ? req.query.deviceId : ''
+  void sendJson(res, () => handlePushInbox(deviceId), {})
+})
+
+app.post('/api/push/opened', (req, res) => {
+  void sendJson(res, handlePushOpened, req.body)
+})
+
+app.post('/api/push/settings', (req, res) => {
+  void sendJson(res, handlePushSettings, req.body)
+})
+
+app.get('/api/cron/push', (req, res) => {
+  void sendJson(
+    res,
+    () =>
+      handleCronPush({
+        authorization: typeof req.headers.authorization === 'string' ? req.headers.authorization : undefined,
+        secret: typeof req.query.secret === 'string' ? req.query.secret : undefined,
+        at: typeof req.query.at === 'string' ? req.query.at : undefined,
+      }),
+    {},
+  )
+})
+
+app.post('/api/cron/push', (req, res) => {
+  const body = req.body && typeof req.body === 'object' ? (req.body as Record<string, unknown>) : {}
+  void sendJson(
+    res,
+    () =>
+      handleCronPush({
+        authorization: typeof req.headers.authorization === 'string' ? req.headers.authorization : undefined,
+        secret: typeof body.secret === 'string' ? body.secret : undefined,
+        at: typeof body.at === 'string' ? body.at : undefined,
+      }),
+    {},
+  )
 })
 
 app.listen(port, '127.0.0.1', () => {
