@@ -1,7 +1,13 @@
 import { emptyFinanceBook, upsertAccount } from '../src/finance/domain/book'
-import { applyFinanceClarification, interpretFinance } from '../src/finance'
+import {
+  applyFinanceClarification,
+  extractFinanceSlices,
+  interpretFinance,
+  isFinanceOnlyUtterance,
+} from '../src/finance'
 import { commitParsedEvents } from '../src/finance/services/apply'
 import { impliedRate } from '../src/finance/domain/currency'
+import { applyMoneyRouting } from '../server/handlers/moneyRoute.ts'
 
 function assert(condition: unknown, message: string) {
   if (!condition) throw new Error(message)
@@ -173,6 +179,56 @@ if (!income || !exchange || exchange.sourceEventId !== income.id || exchange.imp
   console.error('fail persist relation/rate', committed.events)
 } else {
   console.log('ok  persist group + implied rate')
+}
+
+const mixed = 'Corrí 10 km, gasté 50$ en comida y leí 10 páginas'
+if (isFinanceOnlyUtterance(mixed)) {
+  failed += 1
+  console.error('fail mixed note should not be finance-only')
+} else {
+  console.log('ok  mixed note is not finance-only')
+}
+const slices = extractFinanceSlices(mixed)
+if (slices.length !== 1 || !/gaste|gasté|50/i.test(slices[0])) {
+  failed += 1
+  console.error('fail finance slice', slices)
+} else {
+  console.log('ok  finance slice extracted from mixed note')
+}
+if (!isFinanceOnlyUtterance('Me pagaron 50 USDT por Binance.')) {
+  failed += 1
+  console.error('fail finance-only note')
+} else {
+  console.log('ok  finance-only note')
+}
+if (isFinanceOnlyUtterance('Gasté 6000$ comprando una camioneta que era una de mis metas personales')) {
+  failed += 1
+  console.error('fail truck+goals should be mixed')
+} else {
+  console.log('ok  truck + personal goal is mixed')
+}
+
+const routed = applyMoneyRouting(
+  {
+    kind: 'intents',
+    intents: [
+      { id: '1', workspaceId: 'run', capture: { kind: 'new_record', values: { distancia: 10 } } },
+      { id: '2', workspaceId: 'fin', capture: { kind: 'new_record', values: { monto: 50 } } },
+      { id: '3', workspaceId: 'hab', capture: { kind: 'new_record', values: { paginas: 10 } } },
+    ],
+  },
+  [
+    { id: 'run', name: 'Running', kind: 'fitness', fields: [], records: [] },
+    { id: 'fin', name: 'Finanzas', kind: 'finance', fields: [], records: [] },
+    { id: 'hab', name: 'Lectura', kind: 'habits', fields: [], records: [] },
+  ],
+  mixed,
+)
+if (routed.kind !== 'intents' || routed.intents.length !== 3) {
+  failed += 1
+  console.error('fail moneyRoute should keep mixed intents', routed)
+} else {
+  console.log('ok  moneyRoute keeps mixed intents')
 }
 
 if (failed) {

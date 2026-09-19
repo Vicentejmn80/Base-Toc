@@ -196,11 +196,34 @@ function parseClause(text: string, book: FinanceBook): ParsedFinanceEvent {
   return parsed
 }
 
+const MONEY_VERB_RE =
+  /\b(cobr[eé]|pagaron|pagu[eé]|compr[eé]|gast[eé]|pas[eé]|cambi[eé]|vend[ií]|devolv|comisi[oó]n|transfer|ingres|recib[ií]\s+\d)\w*\b/i
+const CURRENCY_HINT_RE = /\$|€|£|\b(d[oó]lares?|euros?|libras?|bol[ií]vares?|usdt|usd|eur|ves|gbp)\b/i
+const NON_FINANCE_ACTIVITY_RE =
+  /(corr[ií]|kil[oó]metr|\bkm\b|p[aá]ginas?|le[ií]\b|leer\b|h[aá]bito|medit|entren|gym|pesas|colegio|contacto|cliente|metas?\b|cumpl[ií]|dorm[ií]|personal)/i
+
 function isMoneyUtterance(text: string) {
-  return (
-    extractAmounts(text).length > 0 ||
-    /\b(cobr|pag|compr|gast|pas[eé]|cambi|vend|devolv|comisi|transfer|ingres|d[oó]lar|euro|usdt|libra)\w*\b/i.test(text)
-  )
+  const amounts = extractAmounts(text)
+  const hasCurrency = amounts.some((hit) => hit.currency) || CURRENCY_HINT_RE.test(text)
+  return MONEY_VERB_RE.test(text) || hasCurrency
+}
+
+export function hasNonFinanceActivity(text: string) {
+  return NON_FINANCE_ACTIVITY_RE.test(text)
+}
+
+export function isFinanceOnlyUtterance(text: string) {
+  return looksLikeFinanceUtterance(text) && !hasNonFinanceActivity(text)
+}
+
+export function extractFinanceSlices(text: string) {
+  const clauses = text
+    .split(/\s*(?:,|;|\.| y | e |, y |despu[eé]s|luego|then)\s+/i)
+    .map((part) => part.replace(/^[,.\s]+|[,.\s]+$/g, ''))
+    .filter((part) => part.length > 2)
+  const money = clauses.filter((clause) => isMoneyUtterance(clause))
+  if (money.length) return money
+  return isMoneyUtterance(text) ? [text.trim()] : []
 }
 
 export function parseFinanceUtterance(text: string, book: FinanceBook): FinanceBrainResult {

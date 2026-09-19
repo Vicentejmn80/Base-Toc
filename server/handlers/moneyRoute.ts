@@ -1,14 +1,22 @@
 import { normalizeName } from './shared.js'
 import type { GlobalWorkspaceDef, ModelGlobalCapture } from '../validate.js'
 
-const SPEND_RE = /\b(gaste|pague|pagu[eé]|compr[eé]|pag[oó]|gast[oó]|compr[oó])\b/i
+const SPEND_RE = /\b(gaste|pague|pagu[eé]|compr[eé]|pag[oó]|gast[oó]|compr[oó]|cobre|me pagaron)\b/i
+const OTHER_ACTIVITY_RE =
+  /(corri|kilometr|\bkm\b|paginas?|\blei\b|\bleer\b|habito|medit|entren|gym|pesas|colegio|contacto|cliente|\bmetas?\b|cumpl[ií]|dormi|personal)/i
 
 export function mentionsMoney(message: string) {
-  return SPEND_RE.test(normalizeName(message))
+  return SPEND_RE.test(normalizeName(message)) || /\$|€|£|\b(usd|eur|usdt|dolares?|euros?)\b/i.test(message)
+}
+
+export function isMixedActivityMessage(message: string) {
+  const text = normalizeName(message)
+  return mentionsMoney(message) && OTHER_ACTIVITY_RE.test(text)
 }
 
 export function findFinanceWorkspace(workspaces: GlobalWorkspaceDef[]) {
   return (
+    workspaces.find((workspace) => workspace.kind === 'finance') ||
     workspaces.find((workspace) => /finanz|money|gasto/i.test(workspace.name)) ||
     workspaces.find((workspace) =>
       workspace.fields.some((field) => field.role === 'amount' && /monto|amount|precio/i.test(`${field.key} ${field.label}`)),
@@ -39,26 +47,18 @@ export function applyMoneyRouting(
   message: string,
 ): ModelGlobalCapture {
   if (!mentionsMoney(message)) return parsed
+  if (isMixedActivityMessage(message)) return parsed
+
   const finance = findFinanceWorkspace(workspaces)
   if (!finance) return parsed
 
   const specific = findSpecificPayeeWorkspace(message, workspaces, finance.id)
-  if (specific) {
+  if (specific && parsed.kind === 'intents' && parsed.intents.every((intent) => intent.workspaceId === specific.id)) {
     return {
       kind: 'needs_clarification',
       question: `Eso es un pago. ¿Lo anoto en ${finance.name} o en ${specific.name}?`,
     }
   }
 
-  if (parsed.kind === 'intents') {
-    const financeIntents = parsed.intents.filter((intent) => intent.workspaceId === finance.id)
-    if (financeIntents.length > 0) {
-      return { ...parsed, intents: financeIntents }
-    }
-  }
-
-  return {
-    kind: 'needs_clarification',
-    question: `Esto suena a un gasto. ¿Lo anoto en ${finance.name}?`,
-  }
+  return parsed
 }

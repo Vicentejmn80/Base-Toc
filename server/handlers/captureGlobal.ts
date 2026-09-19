@@ -15,6 +15,8 @@ function readGlobalWorkspaces(raw: unknown): GlobalWorkspaceDef[] {
     return {
       id,
       name: ctx.name,
+      kind: ctx.kind,
+      description: typeof record.description === 'string' ? record.description : '',
       fields: ctx.fields,
       records: ctx.records,
     }
@@ -38,6 +40,8 @@ function formatWorkspaceBlock(workspace: GlobalWorkspaceDef) {
     : '    - ninguno'
   return `- id: ${workspace.id}
   nombre: ${workspace.name}
+  tipo: ${workspace.kind ?? 'custom'}${workspace.description ? `
+  para qué sirve: ${workspace.description}` : ''}
   campos:
 ${fields}
   registros:

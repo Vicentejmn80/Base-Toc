@@ -29,8 +29,9 @@ import { ensureFinanceBook } from '../../finance/domain/book'
 import {
   applyFinanceClarification,
   commitParsedEvents,
+  extractFinanceSlices,
   interpretFinance,
-  looksLikeFinanceUtterance,
+  isFinanceOnlyUtterance,
   recordValuesFromEvent,
   type FinanceBrainResult,
 } from '../../finance'
@@ -146,7 +147,8 @@ export function GlobalCaptureSheet({ open, seed, onClose }: GlobalCaptureSheetPr
     setGlobalQuestion(null)
 
     const financeWorkspace = workspaces.find((item) => item.kind === 'finance')
-    if (financeWorkspace && looksLikeFinanceUtterance(next)) {
+    const financeFollowUp = financeResult?.kind === 'needs_clarification'
+    if (financeWorkspace && (financeFollowUp || isFinanceOnlyUtterance(next))) {
       const book = ensureFinanceBook(financeWorkspace.finance)
       if (!book.setup.complete) {
         setFinanceWorkspaceId(financeWorkspace.id)
@@ -283,6 +285,36 @@ export function GlobalCaptureSheet({ open, seed, onClose }: GlobalCaptureSheetPr
     }
   }
 
+  function persistFinanceIfPossible(
+    workspace: Workspace,
+    fallbackValues: Record<string, FieldValue>,
+    existing?: RecordItem,
+  ) {
+    if (workspace.kind !== 'finance') {
+      saveRecord(workspace.id, fallbackValues, existing)
+      return
+    }
+    const book = ensureFinanceBook(workspace.finance)
+    const source = financeSource.current || lastAttempt.current || heard || ''
+    const slice = extractFinanceSlices(source).join('. ')
+    if (book.setup.complete && slice) {
+      const interpreted = interpretFinance(slice, book)
+      if (interpreted.kind === 'events') {
+        const committed = commitParsedEvents(book, workspace.id, interpreted.events)
+        saveFinance(
+          workspace.id,
+          committed.book,
+          `Se registraron ${committed.events.length} movimientos financieros.`,
+        )
+        for (const event of committed.events) {
+          saveRecord(workspace.id, recordValuesFromEvent(event))
+        }
+        return
+      }
+    }
+    saveRecord(workspace.id, fallbackValues, existing)
+  }
+
   function confirmIntent(intent: IntentState) {
     const capture = intent.capture
     if (capture.kind !== 'new_record' && capture.kind !== 'update_record') return
@@ -301,7 +333,7 @@ export function GlobalCaptureSheet({ open, seed, onClose }: GlobalCaptureSheetPr
     }
     const values = mergeCaptureValues(workspace, capture.values, existing)
     const insight = buildSaveInsight({ workspace, values, existing })
-    saveRecord(workspace.id, values, existing)
+    persistFinanceIfPossible(workspace, values, existing)
     setIntents((current) =>
       current.map((item) =>
         item.id === intent.id ? { ...item, status: 'saved', insight: insight.text } : item,
@@ -328,7 +360,7 @@ export function GlobalCaptureSheet({ open, seed, onClose }: GlobalCaptureSheetPr
           : undefined
       const values = mergeCaptureValues(workspace, capture.values, existing)
       const insight = buildSaveInsight({ workspace, values, existing })
-      saveRecord(workspace.id, values, existing)
+      persistFinanceIfPossible(workspace, values, existing)
       const incoming = {
         id: existing?.id ?? `__pending_${intent.id}`,
         workspaceId: workspace.id,

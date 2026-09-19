@@ -387,6 +387,8 @@ export function validateCapture(
 export interface GlobalWorkspaceDef {
   id: string
   name: string
+  kind?: string
+  description?: string
   fields: CaptureFieldDef[]
   records: CaptureRecordSummary[]
 }
