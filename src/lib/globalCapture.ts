@@ -15,8 +15,14 @@ export interface GlobalCaptureIntent {
   capture: CaptureResult
 }
 
+export interface GlobalCommitmentDraft {
+  description: string
+  dueDate: string
+  suggestedWorkspaceId?: string
+}
+
 export type GlobalCaptureResult =
-  | { kind: 'intents'; intents: GlobalCaptureIntent[]; createSpace?: { seed: string } }
+  | { kind: 'intents'; intents: GlobalCaptureIntent[]; commitments?: GlobalCommitmentDraft[]; createSpace?: { seed: string } }
   | { kind: 'create_space'; seed: string }
   | { kind: 'needs_clarification'; question: string }
 
@@ -68,6 +74,7 @@ export function assistantLineForCapture(result: CaptureResult, workspaceName?: s
   if (result.kind === 'needs_clarification' || result.kind === 'needs_disambiguation') {
     return result.question
   }
+  if (result.kind === 'new_commitment') return 'Compromiso propuesto'
   if (result.kind === 'update_record') {
     return workspaceName ? `Actualización en ${workspaceName}` : 'Actualización propuesta'
   }

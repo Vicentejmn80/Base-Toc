@@ -107,5 +107,6 @@ ${workspaces.map(formatWorkspaceBlock).join('\n\n')}
         capture,
       }
     }),
+    commitments: parsed.commitments,
   }
 }

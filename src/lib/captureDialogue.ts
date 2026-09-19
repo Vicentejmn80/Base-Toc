@@ -9,6 +9,7 @@ export type CaptureKind =
   | 'update_record'
   | 'needs_disambiguation'
   | 'needs_clarification'
+  | 'new_commitment'
 
 export interface CaptureCandidate {
   id: string
@@ -20,6 +21,7 @@ export type CaptureResult =
   | { kind: 'update_record'; recordId: string; values: Record<string, FieldValue> }
   | { kind: 'needs_disambiguation'; question: string; candidates: CaptureCandidate[] }
   | { kind: 'needs_clarification'; question: string }
+  | { kind: 'new_commitment'; description: string; dueDate: string; suggestedWorkspaceId?: string }
 
 export interface CaptureRequest {
   message: string

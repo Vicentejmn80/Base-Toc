@@ -10,6 +10,7 @@ import {
 import { AreaProgressList } from '../progress/AreaProgressList'
 import { ProgressCoach } from '../progress/ProgressCoach'
 import { ProgressInsight } from '../progress/ProgressInsight'
+import { CommitmentsToday } from './CommitmentsToday'
 import { PromptBox } from './PromptBox'
 
 interface HoyScreenProps {
@@ -52,7 +53,7 @@ export function HoyScreen({
         <PromptBox
           value={prompt}
           voiceScope="global"
-          placeholder="Cuéntame qué pasó..."
+          placeholder="Cuéntame qué pasó... o qué se viene."
           onChange={setPrompt}
           onSubmit={() => {
             const next = prompt.trim()
@@ -69,6 +70,7 @@ export function HoyScreen({
       </div>
 
       <div className="mt-10 space-y-10">
+        <CommitmentsToday workspaces={workspaces} />
         <ProgressInsight observation={observations} />
         <AreaProgressList areas={areas} />
         <ProgressCoach workspaces={workspaces} />

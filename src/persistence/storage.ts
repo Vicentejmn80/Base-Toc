@@ -22,7 +22,10 @@ export const localStorageAdapter: StorageAdapter = {
       const parsed = JSON.parse(raw) as AppSnapshot
       if (!parsed || parsed.version !== STORAGE_VERSION) return null
       if (!Array.isArray(parsed.workspaces) || !Array.isArray(parsed.activities)) return null
-      return parsed
+      return {
+        ...parsed,
+        commitments: Array.isArray(parsed.commitments) ? parsed.commitments : [],
+      }
     } catch {
       return null
     }

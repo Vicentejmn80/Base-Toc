@@ -10,6 +10,7 @@ import {
 import type {
   ActivityEvent,
   ActivityType,
+  Commitment,
   FieldValue,
   Goal,
   RecordItem,
@@ -26,10 +27,11 @@ interface AppState {
   hydrated: boolean
   workspaces: Workspace[]
   activities: ActivityEvent[]
+  commitments: Commitment[]
 }
 
 type Action =
-  | { type: 'hydrate'; workspaces: Workspace[]; activities: ActivityEvent[] }
+  | { type: 'hydrate'; workspaces: Workspace[]; activities: ActivityEvent[]; commitments: Commitment[] }
   | { type: 'create_workspace'; workspace: Workspace; message: string }
   | { type: 'update_workspace'; id: string; patch: Partial<Pick<Workspace, 'name' | 'description' | 'icon' | 'color' | 'finance'>> }
   | { type: 'save_finance'; workspaceId: string; book: FinanceBook; message: string }
@@ -37,11 +39,14 @@ type Action =
   | { type: 'delete_workspace'; id: string }
   | { type: 'upsert_record'; workspaceId: string; record: RecordItem; activity: ActivityEvent }
   | { type: 'delete_record'; workspaceId: string; recordId: string; activity: ActivityEvent }
+  | { type: 'upsert_commitment'; commitment: Commitment }
+  | { type: 'patch_commitment'; id: string; patch: Partial<Commitment> }
 
 const initialState: AppState = {
   hydrated: false,
   workspaces: [],
   activities: [],
+  commitments: [],
 }
 
 function reducer(state: AppState, action: Action): AppState {
@@ -51,6 +56,7 @@ function reducer(state: AppState, action: Action): AppState {
         hydrated: true,
         workspaces: action.workspaces,
         activities: action.activities,
+        commitments: action.commitments,
       }
     case 'create_workspace':
       return {
@@ -131,6 +137,20 @@ function reducer(state: AppState, action: Action): AppState {
         ),
         activities: [action.activity, ...state.activities],
       }
+    case 'upsert_commitment':
+      return {
+        ...state,
+        commitments: state.commitments.some((item) => item.id === action.commitment.id)
+          ? state.commitments.map((item) => (item.id === action.commitment.id ? action.commitment : item))
+          : [action.commitment, ...state.commitments],
+      }
+    case 'patch_commitment':
+      return {
+        ...state,
+        commitments: state.commitments.map((item) =>
+          item.id === action.id ? { ...item, ...action.patch } : item,
+        ),
+      }
     default:
       return state
   }
@@ -160,6 +180,8 @@ interface AppStoreValue extends AppState {
   ) => RecordItem
   deleteRecord: (workspaceId: string, recordId: string) => void
   getWorkspace: (id: string) => Workspace | undefined
+  saveCommitment: (commitment: Commitment) => void
+  patchCommitment: (id: string, patch: Partial<Commitment>) => void
 }
 
 const AppStoreContext = createContext<AppStoreValue | null>(null)
@@ -174,6 +196,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
         type: 'hydrate',
         workspaces: stored.workspaces.map(migrateWorkspaceFields),
         activities: stored.activities,
+        commitments: stored.commitments ?? [],
       })
       return
     }
@@ -182,6 +205,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
       type: 'hydrate',
       workspaces: seed.workspaces.map(migrateWorkspaceFields),
       activities: seed.activities,
+      commitments: [],
     })
   }, [])
 
@@ -191,12 +215,13 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
       version: 1,
       workspaces: state.workspaces,
       activities: state.activities,
+      commitments: state.commitments,
     }
     localStorageAdapter.save(snapshot)
     const flush = () => localStorageAdapter.save(snapshot)
     window.addEventListener('beforeunload', flush)
     return () => window.removeEventListener('beforeunload', flush)
-  }, [state.hydrated, state.workspaces, state.activities])
+  }, [state.hydrated, state.workspaces, state.activities, state.commitments])
 
   const createWorkspace = useCallback((workspace: Workspace) => {
     dispatch({
@@ -274,6 +299,14 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
 
   const getWorkspace = useCallback((id: string) => state.workspaces.find((workspace) => workspace.id === id), [state.workspaces])
 
+  const saveCommitment = useCallback((commitment: Commitment) => {
+    dispatch({ type: 'upsert_commitment', commitment })
+  }, [])
+
+  const patchCommitment = useCallback((id: string, patch: Partial<Commitment>) => {
+    dispatch({ type: 'patch_commitment', id, patch })
+  }, [])
+
   const value = useMemo<AppStoreValue>(
     () => ({
       ...state,
@@ -285,8 +318,10 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
       saveRecord,
       deleteRecord,
       getWorkspace,
+      saveCommitment,
+      patchCommitment,
     }),
-    [state, createWorkspace, updateWorkspace, saveFinance, setGoal, deleteWorkspace, saveRecord, deleteRecord, getWorkspace],
+    [state, createWorkspace, updateWorkspace, saveFinance, setGoal, deleteWorkspace, saveRecord, deleteRecord, getWorkspace, saveCommitment, patchCommitment],
   )
 
   return <AppStoreContext.Provider value={value}>{children}</AppStoreContext.Provider>

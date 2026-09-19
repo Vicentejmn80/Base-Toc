@@ -23,6 +23,7 @@ import {
   type GlobalCaptureResult,
 } from '../../lib/globalCapture'
 import { recordTitle } from '../../lib/records'
+import { CommitmentConfirm } from './CommitmentConfirm'
 import { FinanceConfirm } from '../finance/FinanceConfirm'
 import { FinanceOnboarding } from '../finance/FinanceOnboarding'
 import { ensureFinanceBook } from '../../finance/domain/book'
@@ -35,6 +36,14 @@ import {
   recordValuesFromEvent,
   type FinanceBrainResult,
 } from '../../finance'
+import {
+  applyCommitmentClarification,
+  interpretCommitment,
+  leftoverAfterCommitments,
+  materializeCommitment,
+  type CommitmentParseResult,
+  type ParsedCommitment,
+} from '../../lib/commitment'
 import { useAppStore } from '../../state/store'
 import { useToast } from '../../state/toast'
 import { CreationFlow, type CreationStatus } from '../creation/CreationFlow'
@@ -68,7 +77,7 @@ interface GlobalCaptureSheetProps {
 export function GlobalCaptureSheet({ open, seed, onClose }: GlobalCaptureSheetProps) {
   const plain = usePlainLanguage()
   const navigate = useNavigate()
-  const { workspaces, saveRecord, saveFinance } = useAppStore()
+  const { workspaces, saveRecord, saveFinance, saveCommitment } = useAppStore()
   const { showToast } = useToast()
   const [prompt, setPrompt] = useState('')
   const [status, setStatus] = useState<Status>('idle')
@@ -87,7 +96,10 @@ export function GlobalCaptureSheet({ open, seed, onClose }: GlobalCaptureSheetPr
   const [correctingBatch, setCorrectingBatch] = useState(false)
   const [financeResult, setFinanceResult] = useState<FinanceBrainResult | null>(null)
   const [financeWorkspaceId, setFinanceWorkspaceId] = useState<string | null>(null)
+  const [commitmentDrafts, setCommitmentDrafts] = useState<ParsedCommitment[] | null>(null)
+  const [commitmentParse, setCommitmentParse] = useState<CommitmentParseResult | null>(null)
   const financeSource = useRef('')
+  const commitmentSource = useRef('')
   const lastAttempt = useRef<string | null>(null)
   const abortRef = useRef<AbortController | null>(null)
 
@@ -111,7 +123,10 @@ export function GlobalCaptureSheet({ open, seed, onClose }: GlobalCaptureSheetPr
     setCorrectingBatch(false)
     setFinanceResult(null)
     setFinanceWorkspaceId(null)
+    setCommitmentDrafts(null)
+    setCommitmentParse(null)
     financeSource.current = ''
+    commitmentSource.current = ''
     lastAttempt.current = null
   }
 
@@ -146,9 +161,46 @@ export function GlobalCaptureSheet({ open, seed, onClose }: GlobalCaptureSheetPr
     setError(null)
     setGlobalQuestion(null)
 
+    const clarifyingCommitment = commitmentParse?.kind === 'needs_clarification'
+    const parsedCommitment = clarifyingCommitment
+      ? applyCommitmentClarification(commitmentSource.current || next, next, workspaces, commitmentParse.partial)
+      : interpretCommitment(next, workspaces)
+    const leftover = clarifyingCommitment ? leftoverAfterCommitments(commitmentSource.current || next) : leftoverAfterCommitments(next)
+
+    if (parsedCommitment.kind === 'needs_clarification' && (!leftover || clarifyingCommitment)) {
+      commitmentSource.current = parsedCommitment.partial?.map((item) => item.source).join('. ') || next
+      setCommitmentParse(parsedCommitment)
+      setCommitmentDrafts(null)
+      setFinanceResult(null)
+      setPrompt('')
+      setStatus('idle')
+      setGlobalQuestion(parsedCommitment.question)
+      return
+    }
+
+    if (parsedCommitment.kind === 'commitments') {
+      commitmentSource.current = next
+      setCommitmentParse(parsedCommitment)
+      setCommitmentDrafts(parsedCommitment.items)
+      setGlobalQuestion(null)
+      if (!leftover) {
+        setFinanceResult(null)
+        setIntents([])
+        setCreateSpace(null)
+        setPrompt('')
+        setStatus('idle')
+        return
+      }
+    } else {
+      setCommitmentDrafts(null)
+      setCommitmentParse(null)
+    }
+
+    const captureMessage = parsedCommitment.kind === 'commitments' && leftover ? leftover : next
+
     const financeWorkspace = workspaces.find((item) => item.kind === 'finance')
     const financeFollowUp = financeResult?.kind === 'needs_clarification'
-    if (financeWorkspace && (financeFollowUp || isFinanceOnlyUtterance(next))) {
+    if (financeWorkspace && (financeFollowUp || isFinanceOnlyUtterance(captureMessage))) {
       const book = ensureFinanceBook(financeWorkspace.finance)
       if (!book.setup.complete) {
         setFinanceWorkspaceId(financeWorkspace.id)
@@ -159,8 +211,8 @@ export function GlobalCaptureSheet({ open, seed, onClose }: GlobalCaptureSheetPr
       }
       const interpreted =
         financeResult?.kind === 'needs_clarification'
-          ? applyFinanceClarification(financeSource.current || next, next, book, financeResult.partial)
-          : interpretFinance(next, book)
+          ? applyFinanceClarification(financeSource.current || captureMessage, captureMessage, book, financeResult.partial)
+          : interpretFinance(captureMessage, book)
       financeSource.current = interpreted.source
       setFinanceWorkspaceId(financeWorkspace.id)
       setFinanceResult(interpreted.kind === 'unparsed' ? null : interpreted)
@@ -172,13 +224,13 @@ export function GlobalCaptureSheet({ open, seed, onClose }: GlobalCaptureSheetPr
         setError('Cuéntame qué pasó con el dinero: cantidad, y si puedes, moneda o cuenta.')
       }
       if (interpreted.kind === 'needs_clarification') setGlobalQuestion(interpreted.question)
-      else setGlobalQuestion(null)
+      else if (!commitmentDrafts) setGlobalQuestion(null)
       return
     }
 
     try {
       const result = await requestGlobalCapture(
-        { message: next, workspaces, history },
+        { message: captureMessage, workspaces, history },
         controller.signal,
       )
       if (controller.signal.aborted) return
@@ -229,6 +281,19 @@ export function GlobalCaptureSheet({ open, seed, onClose }: GlobalCaptureSheetPr
     )
     setCreateSpace(result.createSpace ?? null)
     setGlobalQuestion(null)
+    if (result.commitments?.length) {
+      setCommitmentDrafts((current) => {
+        const incoming = result.commitments ?? []
+        const existing = current ?? []
+        const merged = [...existing]
+        for (const item of incoming) {
+          if (!merged.some((draft) => draft.description === item.description && draft.dueDate === item.dueDate)) {
+            merged.push({ ...item, source: message })
+          }
+        }
+        return merged
+      })
+    }
     setHistory((current) => [
       ...current,
       { role: 'user', content: message },
@@ -313,6 +378,20 @@ export function GlobalCaptureSheet({ open, seed, onClose }: GlobalCaptureSheetPr
       }
     }
     saveRecord(workspace.id, fallbackValues, existing)
+  }
+
+  function confirmCommitments() {
+    if (!commitmentDrafts?.length) return
+    for (const draft of commitmentDrafts) {
+      saveCommitment(materializeCommitment(draft))
+    }
+    setBatchReward(
+      commitmentDrafts.length > 1
+        ? `Quedaron ${commitmentDrafts.length} compromisos.`
+        : 'Listo, lo voy a tener presente.',
+    )
+    setCommitmentDrafts(null)
+    setCommitmentParse(null)
   }
 
   function confirmIntent(intent: IntentState) {
@@ -447,6 +526,7 @@ export function GlobalCaptureSheet({ open, seed, onClose }: GlobalCaptureSheetPr
     !batchReward &&
     !financeNeedsSetup &&
     financeResult?.kind !== 'events' &&
+    !commitmentDrafts?.length &&
     (Boolean(globalQuestion) || correctingBatch || (!hasConfirmable && !hasIntentFollowup))
 
   const confirmable = pendingIntents.filter(
@@ -469,6 +549,25 @@ export function GlobalCaptureSheet({ open, seed, onClose }: GlobalCaptureSheetPr
                 {plain ? 'Esto es lo que te escuché' : 'Transcripción'}
               </p>
               <p className="mt-1.5 text-[15px] leading-6 text-ink">“{heard}”</p>
+            </div>
+          ) : null}
+
+          {commitmentDrafts?.length ? (
+            <div className="space-y-4">
+              {commitmentDrafts.map((draft, index) => (
+                <CommitmentConfirm
+                  key={`${draft.description}-${draft.dueDate}-${index}`}
+                  description={draft.description}
+                  dueDate={draft.dueDate ?? ''}
+                  workspaceName={workspaces.find((item) => item.id === draft.suggestedWorkspaceId)?.name}
+                  onConfirm={confirmCommitments}
+                  onEdit={() => {
+                    setCorrectingBatch(true)
+                    setPrompt(commitmentSource.current)
+                    setCommitmentDrafts(null)
+                  }}
+                />
+              ))}
             </div>
           ) : null}
 

@@ -115,8 +115,21 @@ export interface CommandResult {
   matched: boolean
 }
 
+export type CommitmentStatus = 'pendiente' | 'cumplido' | 'no_cumplido' | 'reprogramado'
+
+export interface Commitment {
+  id: string
+  description: string
+  suggestedWorkspaceId?: string
+  dueDate: string
+  status: CommitmentStatus
+  createdAt: string
+  resultingRecordId?: string
+}
+
 export interface AppSnapshot {
   version: number
   workspaces: Workspace[]
   activities: ActivityEvent[]
+  commitments?: Commitment[]
 }

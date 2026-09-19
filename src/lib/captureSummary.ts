@@ -14,6 +14,9 @@ export function captureIntentLine(
   workspace: Workspace | undefined,
   capture: CaptureResult,
 ) {
+  if (capture.kind === 'new_commitment') {
+    return capture.description
+  }
   if (capture.kind !== 'new_record' && capture.kind !== 'update_record') {
     return workspaceName
   }

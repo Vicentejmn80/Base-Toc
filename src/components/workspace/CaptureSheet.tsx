@@ -2,6 +2,7 @@ import { useRef, useState } from 'react'
 import { MessageCircle } from 'lucide-react'
 import type { FieldValue, RecordItem, Workspace } from '../../domain/types'
 import { FinanceConfirm } from '../finance/FinanceConfirm'
+import { CommitmentConfirm } from '../capture/CommitmentConfirm'
 import { ensureFinanceBook } from '../../finance/domain/book'
 import {
   applyFinanceClarification,
@@ -12,6 +13,14 @@ import {
   type ParsedFinanceEvent,
 } from '../../finance'
 import { useAppStore } from '../../state/store'
+import {
+  applyCommitmentClarification,
+  interpretCommitment,
+  leftoverAfterCommitments,
+  materializeCommitment,
+  type CommitmentParseResult,
+  type ParsedCommitment,
+} from '../../lib/commitment'
 import { AiRequestError } from '../../lib/aiClient'
 import {
   captureConfirmLabel,
@@ -59,13 +68,16 @@ function assistantLine(result: CaptureResult) {
 export function CaptureSheet({ open, workspace, onClose, onOpenForm, onConfirm }: CaptureSheetProps) {
   const plain = usePlainLanguage()
   const { showToast } = useToast()
-  const { saveFinance, saveRecord } = useAppStore()
+  const { saveFinance, saveRecord, saveCommitment, workspaces } = useAppStore()
   const [prompt, setPrompt] = useState('')
   const [status, setStatus] = useState<Status>('idle')
   const [error, setError] = useState<string | null>(null)
   const [result, setResult] = useState<CaptureResult | null>(null)
   const [financeResult, setFinanceResult] = useState<FinanceBrainResult | null>(null)
+  const [commitmentDrafts, setCommitmentDrafts] = useState<ParsedCommitment[] | null>(null)
+  const [commitmentParse, setCommitmentParse] = useState<CommitmentParseResult | null>(null)
   const financeSource = useRef('')
+  const commitmentSource = useRef('')
   const [history, setHistory] = useState<HistoryTurn[]>([])
   const [correcting, setCorrecting] = useState(false)
   const [correction, setCorrection] = useState('')
@@ -93,7 +105,10 @@ export function CaptureSheet({ open, workspace, onClose, onOpenForm, onConfirm }
     setCorrection('')
     setReward(null)
     setFinanceResult(null)
+    setCommitmentDrafts(null)
+    setCommitmentParse(null)
     financeSource.current = ''
+    commitmentSource.current = ''
     lastAttempt.current = null
   }
 
@@ -125,6 +140,32 @@ export function CaptureSheet({ open, workspace, onClose, onOpenForm, onConfirm }
     setError(null)
     setCorrecting(false)
     setCorrection('')
+
+    const parsedCommitment =
+      commitmentParse?.kind === 'needs_clarification'
+        ? applyCommitmentClarification(commitmentSource.current || next, next, workspaces, commitmentParse.partial)
+        : interpretCommitment(next, workspaces)
+    if (
+      parsedCommitment.kind === 'needs_clarification' ||
+      (parsedCommitment.kind === 'commitments' && leftoverAfterCommitments(next).length === 0)
+    ) {
+      commitmentSource.current = next
+      setCommitmentParse(parsedCommitment)
+      setCommitmentDrafts(parsedCommitment.kind === 'commitments' ? parsedCommitment.items : null)
+      setFinanceResult(null)
+      setResult(null)
+      setPrompt('')
+      setStatus(parsedCommitment.kind === 'needs_clarification' ? 'idle' : 'idle')
+      setError(null)
+      if (parsedCommitment.kind === 'needs_clarification') {
+        setHistory((current) => [
+          ...current,
+          { role: 'user', content: next },
+          { role: 'assistant', content: parsedCommitment.question },
+        ])
+      }
+      return
+    }
 
     if (workspace.kind === 'finance') {
       const book = ensureFinanceBook(workspace.finance)
@@ -167,7 +208,19 @@ export function CaptureSheet({ open, workspace, onClose, onOpenForm, onConfirm }
         controller.signal,
       )
       if (controller.signal.aborted) return
-      setResult(nextResult)
+      if (nextResult.kind === 'new_commitment') {
+        setCommitmentDrafts([
+          {
+            description: nextResult.description,
+            dueDate: nextResult.dueDate,
+            suggestedWorkspaceId: nextResult.suggestedWorkspaceId ?? workspace.id,
+            source: next,
+          },
+        ])
+        setResult(null)
+      } else {
+        setResult(nextResult)
+      }
       setHistory((current) => [
         ...current,
         { role: 'user', content: next },
@@ -205,6 +258,17 @@ export function CaptureSheet({ open, workspace, onClose, onOpenForm, onConfirm }
     setError(null)
   }
 
+  function confirmCommitments() {
+    if (!commitmentDrafts?.length) return
+    for (const draft of commitmentDrafts) {
+      const suggested = draft.suggestedWorkspaceId ?? workspace.id
+      saveCommitment(materializeCommitment({ ...draft, suggestedWorkspaceId: suggested }))
+    }
+    setReward(commitmentDrafts.length > 1 ? 'Quedaron anotados.' : 'Listo, lo voy a tener presente.')
+    setCommitmentDrafts(null)
+    setCommitmentParse(null)
+  }
+
   function confirm() {
     if (!result || (result.kind !== 'new_record' && result.kind !== 'update_record')) return
     const existing =
@@ -234,6 +298,8 @@ export function CaptureSheet({ open, workspace, onClose, onOpenForm, onConfirm }
 
   const title = reward
     ? workspace.name
+    : commitmentDrafts?.length
+      ? 'Lo que va a pasar'
     : financeResult?.kind === 'events'
       ? 'Entendí esto'
     : result?.kind === 'new_record' || result?.kind === 'update_record'
@@ -267,6 +333,28 @@ export function CaptureSheet({ open, workspace, onClose, onOpenForm, onConfirm }
         result?.kind !== 'new_record' &&
         result?.kind !== 'update_record' ? (
           <ReentryBanner compact />
+        ) : null}
+
+        {commitmentParse?.kind === 'needs_clarification' ? (
+          <div className="rounded-2xl border border-white/0 bg-violet-50 px-4 py-3" data-testid="commitment-clarification">
+            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-violet-700">Una cosa más</p>
+            <p className="mt-1.5 text-sm text-ink">{commitmentParse.question}</p>
+          </div>
+        ) : null}
+
+        {commitmentDrafts?.length ? (
+          <CommitmentConfirm
+            description={commitmentDrafts[0].description}
+            dueDate={commitmentDrafts[0].dueDate ?? ''}
+            workspaceName={
+              workspaces.find((item) => item.id === (commitmentDrafts[0].suggestedWorkspaceId ?? workspace.id))?.name
+            }
+            onConfirm={confirmCommitments}
+            onEdit={() => {
+              setCorrecting(true)
+              setCorrection(commitmentSource.current)
+            }}
+          />
         ) : null}
 
         {financeResult?.kind === 'needs_clarification' ? (
@@ -391,6 +479,7 @@ export function CaptureSheet({ open, workspace, onClose, onOpenForm, onConfirm }
         {!reward &&
         !correcting &&
         financeResult?.kind !== 'events' &&
+        !commitmentDrafts?.length &&
         result?.kind !== 'new_record' &&
         result?.kind !== 'update_record' &&
         result?.kind !== 'needs_disambiguation' ? (

@@ -260,6 +260,7 @@ export type ModelCapture =
   | { kind: 'update_record'; recordId: string; values: Record<string, string | number | boolean> }
   | { kind: 'needs_disambiguation'; question: string; candidates: { id: string; title: string }[] }
   | { kind: 'needs_clarification'; question: string }
+  | { kind: 'new_commitment'; description: string; dueDate: string; suggestedWorkspaceId?: string }
 
 function coerceCaptureValue(
   field: CaptureFieldDef,
@@ -379,8 +380,21 @@ export function validateCapture(
     }
   }
 
+  if (kind === 'new_commitment') {
+    const dueDate = asString(value.dueDate, 'dueDate')
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(dueDate)) {
+      throw new ValidationError('dueDate debe ser YYYY-MM-DD.')
+    }
+    return {
+      kind: 'new_commitment',
+      description: asString(value.description, 'description'),
+      dueDate,
+      suggestedWorkspaceId: asOptionalString(value.suggestedWorkspaceId),
+    }
+  }
+
   throw new ValidationError(
-    'kind debe ser new_record, update_record, needs_disambiguation o needs_clarification.',
+    'kind debe ser new_record, update_record, new_commitment, needs_disambiguation o needs_clarification.',
   )
 }
 
@@ -402,7 +416,13 @@ export type ModelGlobalIntent = {
 export type ModelGlobalCapture =
   | { kind: 'create_space'; seed: string }
   | { kind: 'needs_clarification'; question: string }
-  | { kind: 'intents'; intents: ModelGlobalIntent[]; createSpace?: { seed: string } }
+  | { kind: 'intents'; intents: ModelGlobalIntent[]; createSpace?: { seed: string }; commitments?: ModelCaptureCommitment[] }
+
+export interface ModelCaptureCommitment {
+  description: string
+  dueDate: string
+  suggestedWorkspaceId?: string
+}
 
 function asCreateSeed(value: unknown, fallback: string) {
   if (isRecord(value) && typeof value.seed === 'string' && value.seed.trim()) {
@@ -429,17 +449,51 @@ export function validateGlobalCapture(
     return { kind: 'create_space', seed: asCreateSeed(value.seed, userMessage) }
   }
 
-  if (kind !== 'intents') {
-    throw new ValidationError('kind debe ser intents, create_space o needs_clarification.')
+  if (kind === 'new_commitment') {
+    const dueDate = asString(value.dueDate, 'dueDate')
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(dueDate)) {
+      throw new ValidationError('dueDate debe ser YYYY-MM-DD.')
+    }
+    const suggested = asOptionalString(value.suggestedWorkspaceId)
+    return {
+      kind: 'intents',
+      intents: [],
+      commitments: [
+        {
+          description: asString(value.description, 'description'),
+          dueDate,
+          suggestedWorkspaceId: suggested && byId.has(suggested) ? suggested : undefined,
+        },
+      ],
+    }
   }
 
-  if (!Array.isArray(value.intents)) {
+  if (kind !== 'intents') {
+    throw new ValidationError('kind debe ser intents, create_space, new_commitment o needs_clarification.')
+  }
+
+  if (value.intents !== undefined && !Array.isArray(value.intents)) {
     throw new ValidationError('intents debe ser una lista.')
   }
 
   const intents: ModelGlobalIntent[] = []
-  value.intents.forEach((raw, index) => {
+  const commitments: ModelCaptureCommitment[] = []
+  const rawIntents = Array.isArray(value.intents) ? value.intents : []
+  rawIntents.forEach((raw, index) => {
     if (!isRecord(raw)) throw new ValidationError(`intents[${index}] no es un objeto.`)
+    if (raw.kind === 'new_commitment') {
+      const dueDate = asString(raw.dueDate, `intents[${index}].dueDate`)
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(dueDate)) {
+        throw new ValidationError(`intents[${index}].dueDate debe ser YYYY-MM-DD.`)
+      }
+      const suggested = asOptionalString(raw.suggestedWorkspaceId ?? raw.workspaceId)
+      commitments.push({
+        description: asString(raw.description, `intents[${index}].description`),
+        dueDate,
+        suggestedWorkspaceId: suggested && byId.has(suggested) ? suggested : undefined,
+      })
+      return
+    }
     const workspaceId = asString(raw.workspaceId, `intents[${index}].workspaceId`)
     const workspace = byId.get(workspaceId)
     if (!workspace) {
@@ -453,18 +507,39 @@ export function validateGlobalCapture(
     })
   })
 
+  if (Array.isArray(value.commitments)) {
+    value.commitments.forEach((raw, index) => {
+      if (!isRecord(raw)) throw new ValidationError(`commitments[${index}] no es un objeto.`)
+      const dueDate = asString(raw.dueDate, `commitments[${index}].dueDate`)
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(dueDate)) {
+        throw new ValidationError(`commitments[${index}].dueDate debe ser YYYY-MM-DD.`)
+      }
+      const suggested = asOptionalString(raw.suggestedWorkspaceId)
+      commitments.push({
+        description: asString(raw.description, `commitments[${index}].description`),
+        dueDate,
+        suggestedWorkspaceId: suggested && byId.has(suggested) ? suggested : undefined,
+      })
+    })
+  }
+
   const createSpaceRaw = value.createSpace
   const createSpace =
     createSpaceRaw && createSpaceRaw !== null
       ? { seed: asCreateSeed(createSpaceRaw, userMessage) }
       : undefined
 
-  if (intents.length === 0 && createSpace) {
+  if (intents.length === 0 && commitments.length === 0 && createSpace) {
     return { kind: 'create_space', seed: createSpace.seed }
   }
-  if (intents.length === 0) {
+  if (intents.length === 0 && commitments.length === 0) {
     return { kind: 'create_space', seed: userMessage }
   }
 
-  return { kind: 'intents', intents, createSpace }
+  return {
+    kind: 'intents',
+    intents,
+    createSpace,
+    commitments: commitments.length ? commitments : undefined,
+  }
 }
