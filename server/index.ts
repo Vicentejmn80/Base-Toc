@@ -7,6 +7,7 @@ import { handleAnalyze } from './handlers/analyze.ts'
 import { handleCapture } from './handlers/capture.ts'
 import { handleCaptureGlobal } from './handlers/captureGlobal.ts'
 import { handleCreation } from './handlers/creation.ts'
+import { handleTranscribe } from './handlers/transcribe.ts'
 import { errorMessage, errorStatus } from './handlers/http.ts'
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
@@ -21,7 +22,7 @@ app.use(
     origin: [/^http:\/\/127\.0\.0\.1:\d+$/, /^http:\/\/localhost:\d+$/],
   }),
 )
-app.use(express.json({ limit: '200kb' }))
+app.use(express.json({ limit: '12mb' }))
 
 async function sendJson(
   res: express.Response,
@@ -54,6 +55,10 @@ app.post('/api/ai/capture-global', (req, res) => {
 
 app.post('/api/ai/analyze', (req, res) => {
   void sendJson(res, handleAnalyze, req.body)
+})
+
+app.post('/api/ai/transcribe', (req, res) => {
+  void sendJson(res, handleTranscribe, req.body)
 })
 
 app.listen(port, '127.0.0.1', () => {

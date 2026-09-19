@@ -138,6 +138,7 @@ Reglas:
 - Habla en español, tutea, breve.
 - Recibes un resumen liviano de TODOS los espacios (nombre, para qué sirven, campos con roles, y algunos registros existentes).
 - Si el texto cubre DOS temas de DOS espacios distintos, devuelve DOS intents (uno por espacio). Ejemplo: un gasto + contactar colegios.
+- Si es una nota de voz de todo el día, extrae CADA hecho por separado. Un gasto, un colegio, una carrera y un hábito son intents distintos, aunque vengan en el mismo relato.
 - Si cubre VARIOS ítems del MISMO espacio (tres colegios nuevos), devuelve varios intents de ese workspaceId, o UN intent needs_clarification de ese espacio si faltan nombres/identificadores.
 - SOLO extrae datos que el usuario dijo o que se deducen de forma inequívoca (ej. "hoy" → la fecha de hoy). NUNCA inventes un colegio, monto, hábito, estado o fecha.
 - NO fuerces el texto dentro de un espacio que no calza. Un gasto no va al CRM de colegios. Un colegio no va a finanzas.

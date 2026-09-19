@@ -251,7 +251,7 @@ export function HomeScreen() {
               voiceScope={hasSpaces ? 'global' : 'home'}
               placeholder={
                 hasSpaces
-                  ? 'Cuéntame qué pasó, o qué quieres empezar a medir...'
+                  ? 'Cuéntame el día o graba una nota. Yo lo acomodo en cada espacio.'
                   : undefined
               }
               onChange={setPrompt}

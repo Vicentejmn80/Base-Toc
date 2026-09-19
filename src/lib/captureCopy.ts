@@ -17,7 +17,7 @@ export function humanAiError(message: string, plain: boolean) {
 }
 
 export function captureLoadingCopy(plain: boolean) {
-  return plain ? 'Dame un segundo, estoy revisando esto' : 'Interpretando lo que pasó…'
+  return plain ? 'Dame un segundo, estoy acomodando lo que contaste' : 'Interpretando lo que pasó…'
 }
 
 export function captureHeadline(

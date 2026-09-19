@@ -18,6 +18,7 @@ En `.env.local` define (sin prefijo `VITE_`):
 
 - `OPENAI_API_KEY` — clave de OpenAI (solo servidor, nunca en el frontend)
 - `OPENAI_MODEL` — opcional, por defecto `gpt-4o-mini`
+- `OPENAI_TRANSCRIBE_MODEL` — opcional, por defecto `gpt-4o-mini-transcribe` (si falla, usa `whisper-1`)
 
 Arranca cliente + servidor Express de IA:
 
@@ -46,6 +47,8 @@ npm run preview
 4. Las rutas de IA viven en **`/api`** (Serverless Functions), no en Express:
    - `POST /api/ai/creation`
    - `POST /api/ai/capture`
+   - `POST /api/ai/capture-global`
+   - `POST /api/ai/transcribe`
    - `POST /api/ai/analyze`
    - `GET /api/health`
 5. El frontend usa `fetch('/api/ai/...')` en el mismo dominio; la API key **no** viaja al navegador.
@@ -59,6 +62,7 @@ Usa los mismos nombres que en local, **sin** prefijo `VITE_`:
 |------------------|-------------|--------------------------------------|
 | `OPENAI_API_KEY` | Sí          | Clave de OpenAI (solo backend)       |
 | `OPENAI_MODEL`   | No          | Modelo, ej. `gpt-4o-mini` (default)  |
+| `OPENAI_TRANSCRIBE_MODEL` | No | Transcripción, default `gpt-4o-mini-transcribe` |
 
 Marca al menos **Production** y **Preview** (recomendado también **Development** si usas `vercel dev`).
 

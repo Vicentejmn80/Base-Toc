@@ -66,6 +66,7 @@ export function GlobalCaptureSheet({ open, seed, onClose }: GlobalCaptureSheetPr
   const [creationStatus, setCreationStatus] = useState<CreationStatus>('idle')
   const [creationError, setCreationError] = useState<string | null>(null)
   const [dialogueState, setDialogueState] = useState<CreationDialogueState>(emptyDialogueState)
+  const [heard, setHeard] = useState<string | null>(null)
   const lastAttempt = useRef<string | null>(null)
   const abortRef = useRef<AbortController | null>(null)
 
@@ -84,6 +85,7 @@ export function GlobalCaptureSheet({ open, seed, onClose }: GlobalCaptureSheetPr
     setCreationStatus('idle')
     setCreationError(null)
     setDialogueState(emptyDialogueState())
+    setHeard(null)
     lastAttempt.current = null
   }
 
@@ -113,6 +115,7 @@ export function GlobalCaptureSheet({ open, seed, onClose }: GlobalCaptureSheetPr
     const controller = new AbortController()
     abortRef.current = controller
     lastAttempt.current = next
+    setHeard(next)
     setStatus('loading')
     setError(null)
     setGlobalQuestion(null)
@@ -225,7 +228,7 @@ export function GlobalCaptureSheet({ open, seed, onClose }: GlobalCaptureSheetPr
     }
   }
 
-  function confirmIntent(intent: IntentState) {
+  function confirmIntent(intent: IntentState, options?: { silent?: boolean }) {
     const capture = intent.capture
     if (capture.kind !== 'new_record' && capture.kind !== 'update_record') return
     const workspace = workspaces.find((item) => item.id === intent.workspaceId)
@@ -245,7 +248,24 @@ export function GlobalCaptureSheet({ open, seed, onClose }: GlobalCaptureSheetPr
     setIntents((current) =>
       current.map((item) => (item.id === intent.id ? { ...item, status: 'saved' } : item)),
     )
-    showToast(captureSavedToast(workspace.name, Boolean(existing), plain), 'success')
+    if (!options?.silent) {
+      showToast(captureSavedToast(workspace.name, Boolean(existing), plain), 'success')
+    }
+  }
+
+  function confirmAll() {
+    const ready = intents.filter(
+      (intent) =>
+        intent.status === 'pending' &&
+        (intent.capture.kind === 'new_record' || intent.capture.kind === 'update_record'),
+    )
+    ready.forEach((intent) => confirmIntent(intent, { silent: true }))
+    if (ready.length) {
+      showToast(
+        plain ? `Listo, anoté ${ready.length === 1 ? 'eso' : `las ${ready.length} cosas`}` : 'Cambios guardados',
+        'success',
+      )
+    }
   }
 
   async function startCreateSpace(seedText: string) {
@@ -298,15 +318,27 @@ export function GlobalCaptureSheet({ open, seed, onClose }: GlobalCaptureSheetPr
     !busyIntentId &&
     (Boolean(globalQuestion) || (!hasConfirmable && !hasIntentFollowup))
 
+  const confirmable = pendingIntents.filter(
+    (intent) => intent.capture.kind === 'new_record' || intent.capture.kind === 'update_record',
+  )
   const title = plain ? 'Contar' : 'Qué pasó'
   const description = plain
-    ? 'Dímelo como quieras. Yo lo acomodo en el espacio que toque.'
-    : 'Cuéntame qué pasó. Confirma cada anotación antes de guardar.'
+    ? 'Graba una nota o escríbela. Yo te digo a dónde iría cada cosa.'
+    : 'Cuéntame el día. Confirma cada anotación antes de guardar.'
 
   return (
     <>
       <Modal open={open} wide title={title} description={description} onClose={close}>
         <div className="space-y-4" data-testid="global-capture-sheet">
+          {heard ? (
+            <div className="rounded-2xl border border-line bg-canvas px-4 py-3">
+              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">
+                {plain ? 'Esto es lo que te escuché' : 'Transcripción'}
+              </p>
+              <p className="mt-1.5 text-[15px] leading-6 text-ink">“{heard}”</p>
+            </div>
+          ) : null}
+
           {globalQuestion ? (
             <div className="rounded-2xl border border-white/0 bg-violet-50 px-4 py-3">
               <p className="text-xs font-semibold uppercase tracking-[0.12em] text-violet-700">
@@ -363,7 +395,11 @@ export function GlobalCaptureSheet({ open, seed, onClose }: GlobalCaptureSheetPr
                   ? plain
                     ? 'Dame un segundo, estoy armando este espacio'
                     : 'Diseñando tu espacio…'
-                  : captureLoadingCopy(plain)}
+                  : heard
+                    ? plain
+                      ? 'Estoy viendo a dónde va cada cosa de tu nota'
+                      : captureLoadingCopy(plain)
+                    : captureLoadingCopy(plain)}
               </p>
               <div className="mt-3 h-1 overflow-hidden rounded-full bg-soft">
                 <div className="h-full w-2/3 animate-pulse rounded-full bg-[linear-gradient(90deg,#93c5fd,#818cf8,#c084fc)]" />
@@ -401,8 +437,8 @@ export function GlobalCaptureSheet({ open, seed, onClose }: GlobalCaptureSheetPr
               voiceScope="global"
               placeholder={
                 plain
-                  ? 'Hoy gasté 40 en el mercado, hablé con un colegio…'
-                  : 'Cuéntame qué pasó, aunque mezcle varios espacios'
+                  ? 'Graba el día o escríbelo: gastos, colegios, lo que sea…'
+                  : 'Cuéntame el día, aunque mezcle varios espacios'
               }
               onChange={setPrompt}
               onSubmit={() => {
@@ -414,6 +450,7 @@ export function GlobalCaptureSheet({ open, seed, onClose }: GlobalCaptureSheetPr
                 void submitGlobal(prompt)
               }}
               onVoiceTranscript={(text) => {
+                setHeard(text)
                 setPrompt(text)
                 void submitGlobal(text)
               }}
@@ -422,10 +459,15 @@ export function GlobalCaptureSheet({ open, seed, onClose }: GlobalCaptureSheetPr
           ) : null}
         </div>
 
-        <div className="mt-6 flex justify-end">
+        <div className="mt-6 flex flex-wrap justify-end gap-2">
           <Button variant="secondary" onClick={close}>
             {pendingIntents.length > 0 ? (plain ? 'Cerrar' : 'Cerrar') : plain ? 'Listo' : 'Cerrar'}
           </Button>
+          {confirmable.length > 1 ? (
+            <Button onClick={confirmAll} disabled={Boolean(busyIntentId)}>
+              {plain ? 'Anotar todo' : 'Confirmar todo'}
+            </Button>
+          ) : null}
         </div>
       </Modal>
 
