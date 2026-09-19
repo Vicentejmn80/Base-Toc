@@ -1,26 +1,39 @@
-import OpenAI from 'openai'
 import { ValidationError } from './validate'
+import { AiConfigError, AiTimeoutError } from './aiErrors'
+
+export { AiConfigError, AiTimeoutError }
 
 const TIMEOUT_MS = 15_000
 
-export class AiTimeoutError extends Error {
-  constructor() {
-    super('La solicitud a la IA tardó más de 15 segundos.')
-    this.name = 'AiTimeoutError'
+type OpenAIClient = {
+  chat: {
+    completions: {
+      create: (input: {
+        model: string
+        temperature: number
+        response_format: { type: 'json_object' }
+        messages: { role: 'system' | 'user' | 'assistant'; content: string }[]
+      }) => Promise<{ choices: { message?: { content?: string | null } }[] }>
+    }
+  }
+  audio: {
+    transcriptions: {
+      create: (input: {
+        file: unknown
+        model: string
+        language: string
+        prompt?: string
+      }) => Promise<{ text?: string }>
+    }
   }
 }
 
-export class AiConfigError extends Error {
-  constructor() {
-    super('Falta OPENAI_API_KEY en el servidor. Créala en .env.local.')
-    this.name = 'AiConfigError'
-  }
-}
-
-function getClient(timeoutMs = TIMEOUT_MS) {
+async function getClient(timeoutMs = TIMEOUT_MS): Promise<OpenAIClient> {
   const apiKey = process.env.OPENAI_API_KEY
   if (!apiKey) throw new AiConfigError()
-  return new OpenAI({ apiKey, timeout: timeoutMs })
+  const mod = await import('openai')
+  const OpenAI = mod.default
+  return new OpenAI({ apiKey, timeout: timeoutMs }) as unknown as OpenAIClient
 }
 
 export function getModel() {
@@ -42,7 +55,7 @@ export async function transcribeAudioFile(input: {
 
   for (const model of models) {
     try {
-      const client = getClient(60_000)
+      const client = await getClient(60_000)
       const { toFile } = await import('openai')
       const file = await toFile(input.buffer, input.filename, { type: input.mimeType })
       const result = await client.audio.transcriptions.create({
@@ -85,7 +98,7 @@ export async function completeJson(options: {
   messages: { role: 'user' | 'assistant'; content: string }[]
   timeoutMs?: number
 }): Promise<string> {
-  const client = getClient(options.timeoutMs)
+  const client = await getClient(options.timeoutMs)
   try {
     const response = await client.chat.completions.create({
       model: getModel(),

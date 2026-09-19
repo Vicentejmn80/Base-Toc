@@ -1,4 +1,4 @@
-import { AiConfigError, AiTimeoutError } from '../openai'
+import { AiConfigError, AiTimeoutError } from '../aiErrors'
 import { ValidationError } from '../validate'
 import { HttpError } from './shared'
 

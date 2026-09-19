@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto'
-import { completeJson, AiConfigError, AiTimeoutError } from '../openai'
+import { AiConfigError, AiTimeoutError } from '../aiErrors'
+import { completeJson } from '../openai'
 import { parseModelJson, ValidationError, type ModelProposal } from '../validate'
 
 export interface HistoryTurn {

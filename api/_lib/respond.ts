@@ -16,6 +16,10 @@ export async function handlePost(
     return res.status(200).json(result)
   } catch (error) {
     console.error('[api]', error instanceof Error ? error.stack || error.message : error)
-    return res.status(errorStatus(error)).json({ error: errorMessage(error) })
+    const status = errorStatus(error)
+    return res.status(status).json({
+      error: errorMessage(error),
+      code: error instanceof Error ? error.name : 'Error',
+    })
   }
 }

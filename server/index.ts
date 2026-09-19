@@ -39,7 +39,11 @@ async function sendJson(
 }
 
 app.get('/api/health', (_req, res) => {
-  res.json({ ok: true, model: process.env.OPENAI_MODEL || 'gpt-4o-mini' })
+  res.json({
+    ok: true,
+    model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
+    hasOpenAiKey: Boolean(process.env.OPENAI_API_KEY),
+  })
 })
 
 app.post('/api/ai/creation', (req, res) => {
