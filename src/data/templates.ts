@@ -58,6 +58,12 @@ export function financeFields(): Field[] {
       options: [
         { value: 'Ingreso', label: 'Ingreso' },
         { value: 'Gasto', label: 'Gasto' },
+        { value: 'Transferencia', label: 'Transferencia' },
+        { value: 'Conversion', label: 'Conversión' },
+        { value: 'Reembolso', label: 'Reembolso' },
+        { value: 'Comision', label: 'Comisión' },
+        { value: 'Ajuste', label: 'Ajuste' },
+        { value: 'Otro', label: 'Otro' },
       ],
     }),
     field('categoria', 'Categoría', 'select', {

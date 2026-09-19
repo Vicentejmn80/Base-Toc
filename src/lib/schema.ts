@@ -1,4 +1,5 @@
 import type { Field, FieldRole, FieldValue, RecordItem, Workspace } from '../domain/types'
+import { ensureFinanceBook } from '../finance/domain/book'
 
 export interface WorkspaceSchema {
   identifier?: Field
@@ -96,8 +97,9 @@ export function signedAmount(record: RecordItem, schema: WorkspaceSchema) {
   const amount = recordNumber(record, schema.amount)
   if (!schema.flowCategory) return { income: 0, expense: 0, total: amount }
   const kind = normalize(recordText(record, schema.flowCategory))
-  if (/gasto|expense|salida/.test(kind)) return { income: 0, expense: amount, total: -amount }
-  if (/ingreso|income|venta/.test(kind)) return { income: amount, expense: 0, total: amount }
+  if (/transfer|conversion|cambio|ajuste|exchange/.test(kind)) return { income: 0, expense: 0, total: 0 }
+  if (/gasto|expense|salida|comision|fee/.test(kind)) return { income: 0, expense: amount, total: -amount }
+  if (/ingreso|income|venta|reembolso|refund/.test(kind)) return { income: amount, expense: 0, total: amount }
   return { income: 0, expense: 0, total: amount }
 }
 
@@ -182,21 +184,27 @@ export function migrateWorkspaceFields(workspace: Workspace): Workspace {
     if (field.type === 'longText') return false
     return true
   })
-  if (!needsMigration) return workspace
 
-  const fields: Field[] = []
-  for (let index = 0; index < workspace.fields.length; index += 1) {
-    fields.push(inferFieldRole(workspace.fields[index], index, [...fields, ...workspace.fields.slice(index)], workspace.kind))
+  let next = workspace
+  if (needsMigration) {
+    const fields: Field[] = []
+    for (let index = 0; index < workspace.fields.length; index += 1) {
+      fields.push(inferFieldRole(workspace.fields[index], index, [...fields, ...workspace.fields.slice(index)], workspace.kind))
+    }
+
+    const goals = workspace.goals.map((goal) => {
+      if (goal.unit === 'PEN') return { ...goal, unit: 'S/' }
+      const amount = fields.find((field) => field.role === 'amount')
+      if (!goal.unit && amount?.unit) return { ...goal, unit: amount.unit }
+      return goal
+    })
+    next = { ...workspace, fields, goals }
   }
 
-  const goals = workspace.goals.map((goal) => {
-    if (goal.unit === 'PEN') return { ...goal, unit: 'S/' }
-    const amount = fields.find((field) => field.role === 'amount')
-    if (!goal.unit && amount?.unit) return { ...goal, unit: amount.unit }
-    return goal
-  })
-
-  return { ...workspace, fields, goals }
+  if (next.kind === 'finance') {
+    return { ...next, finance: ensureFinanceBook(next.finance) }
+  }
+  return next
 }
 
 export function captureExample(workspace: Workspace) {

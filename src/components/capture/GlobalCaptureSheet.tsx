@@ -23,6 +23,17 @@ import {
   type GlobalCaptureResult,
 } from '../../lib/globalCapture'
 import { recordTitle } from '../../lib/records'
+import { FinanceConfirm } from '../finance/FinanceConfirm'
+import { FinanceOnboarding } from '../finance/FinanceOnboarding'
+import { ensureFinanceBook } from '../../finance/domain/book'
+import {
+  applyFinanceClarification,
+  commitParsedEvents,
+  interpretFinance,
+  looksLikeFinanceUtterance,
+  recordValuesFromEvent,
+  type FinanceBrainResult,
+} from '../../finance'
 import { useAppStore } from '../../state/store'
 import { useToast } from '../../state/toast'
 import { CreationFlow, type CreationStatus } from '../creation/CreationFlow'
@@ -56,7 +67,7 @@ interface GlobalCaptureSheetProps {
 export function GlobalCaptureSheet({ open, seed, onClose }: GlobalCaptureSheetProps) {
   const plain = usePlainLanguage()
   const navigate = useNavigate()
-  const { workspaces, saveRecord } = useAppStore()
+  const { workspaces, saveRecord, saveFinance } = useAppStore()
   const { showToast } = useToast()
   const [prompt, setPrompt] = useState('')
   const [status, setStatus] = useState<Status>('idle')
@@ -73,6 +84,9 @@ export function GlobalCaptureSheet({ open, seed, onClose }: GlobalCaptureSheetPr
   const [heard, setHeard] = useState<string | null>(null)
   const [batchReward, setBatchReward] = useState<string | null>(null)
   const [correctingBatch, setCorrectingBatch] = useState(false)
+  const [financeResult, setFinanceResult] = useState<FinanceBrainResult | null>(null)
+  const [financeWorkspaceId, setFinanceWorkspaceId] = useState<string | null>(null)
+  const financeSource = useRef('')
   const lastAttempt = useRef<string | null>(null)
   const abortRef = useRef<AbortController | null>(null)
 
@@ -94,6 +108,9 @@ export function GlobalCaptureSheet({ open, seed, onClose }: GlobalCaptureSheetPr
     setHeard(null)
     setBatchReward(null)
     setCorrectingBatch(false)
+    setFinanceResult(null)
+    setFinanceWorkspaceId(null)
+    financeSource.current = ''
     lastAttempt.current = null
   }
 
@@ -127,6 +144,35 @@ export function GlobalCaptureSheet({ open, seed, onClose }: GlobalCaptureSheetPr
     setStatus('loading')
     setError(null)
     setGlobalQuestion(null)
+
+    const financeWorkspace = workspaces.find((item) => item.kind === 'finance')
+    if (financeWorkspace && looksLikeFinanceUtterance(next)) {
+      const book = ensureFinanceBook(financeWorkspace.finance)
+      if (!book.setup.complete) {
+        setFinanceWorkspaceId(financeWorkspace.id)
+        setFinanceResult(null)
+        setPrompt('')
+        setStatus('idle')
+        return
+      }
+      const interpreted =
+        financeResult?.kind === 'needs_clarification'
+          ? applyFinanceClarification(financeSource.current || next, next, book, financeResult.partial)
+          : interpretFinance(next, book)
+      financeSource.current = interpreted.source
+      setFinanceWorkspaceId(financeWorkspace.id)
+      setFinanceResult(interpreted.kind === 'unparsed' ? null : interpreted)
+      setIntents([])
+      setCreateSpace(null)
+      setPrompt('')
+      setStatus(interpreted.kind === 'unparsed' ? 'error' : 'idle')
+      if (interpreted.kind === 'unparsed') {
+        setError('Cuéntame qué pasó con el dinero: cantidad, y si puedes, moneda o cuenta.')
+      }
+      if (interpreted.kind === 'needs_clarification') setGlobalQuestion(interpreted.question)
+      else setGlobalQuestion(null)
+      return
+    }
 
     try {
       const result = await requestGlobalCapture(
@@ -360,11 +406,15 @@ export function GlobalCaptureSheet({ open, seed, onClose }: GlobalCaptureSheetPr
     (intent) =>
       intent.capture.kind === 'needs_clarification' || intent.capture.kind === 'needs_disambiguation',
   )
+  const financeWorkspace = workspaces.find((item) => item.id === financeWorkspaceId)
+  const financeNeedsSetup = Boolean(financeWorkspace && !ensureFinanceBook(financeWorkspace.finance).setup.complete)
   const showPrompt =
     status !== 'loading' &&
     creationStatus !== 'loading' &&
     !busyIntentId &&
     !batchReward &&
+    !financeNeedsSetup &&
+    financeResult?.kind !== 'events' &&
     (Boolean(globalQuestion) || correctingBatch || (!hasConfirmable && !hasIntentFollowup))
 
   const confirmable = pendingIntents.filter(
@@ -388,6 +438,48 @@ export function GlobalCaptureSheet({ open, seed, onClose }: GlobalCaptureSheetPr
               </p>
               <p className="mt-1.5 text-[15px] leading-6 text-ink">“{heard}”</p>
             </div>
+          ) : null}
+
+          {financeNeedsSetup && financeWorkspace ? (
+            <FinanceOnboarding
+              book={financeWorkspace.finance}
+              onComplete={(book) => {
+                saveFinance(financeWorkspace.id, book, 'Se configuró el espacio de finanzas.')
+              }}
+            />
+          ) : null}
+
+          {financeResult?.kind === 'events' ? (
+            <FinanceConfirm
+              events={financeResult.events}
+              onConfirm={() => {
+                if (!financeWorkspace) return
+                const committed = commitParsedEvents(
+                  ensureFinanceBook(financeWorkspace.finance),
+                  financeWorkspace.id,
+                  financeResult.events,
+                )
+                saveFinance(
+                  financeWorkspace.id,
+                  committed.book,
+                  `Se registraron ${committed.events.length} movimientos financieros.`,
+                )
+                for (const event of committed.events) {
+                  saveRecord(financeWorkspace.id, recordValuesFromEvent(event))
+                }
+                setBatchReward(
+                  committed.events.length > 1
+                    ? `Registré ${committed.events.length} movimientos.`
+                    : 'Listo, lo anoté en Finanzas.',
+                )
+                setFinanceResult(null)
+              }}
+              onEdit={() => {
+                setCorrectingBatch(true)
+                setPrompt(financeSource.current)
+                setFinanceResult(null)
+              }}
+            />
           ) : null}
 
           {globalQuestion ? (

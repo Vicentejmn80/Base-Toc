@@ -1,4 +1,5 @@
 import type { Workspace, WorkspaceProposal } from '../domain/types'
+import { emptyFinanceBook } from '../finance/domain/book'
 import { createId } from '../lib/id'
 import { genericFields, templates } from '../data/templates'
 
@@ -187,6 +188,7 @@ export function materializeProposal(proposal: WorkspaceProposal): Workspace {
     fields: proposal.fields.map((field) => ({ ...field, id: createId('field') })),
     records: [],
     goals: proposal.goals.map((goal) => ({ ...goal, id: createId('goal'), workspaceId: id })),
+    finance: proposal.kind === 'finance' ? emptyFinanceBook() : undefined,
   }
 }
 

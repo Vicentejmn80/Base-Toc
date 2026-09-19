@@ -1,6 +1,17 @@
 import { useRef, useState } from 'react'
 import { MessageCircle } from 'lucide-react'
 import type { FieldValue, RecordItem, Workspace } from '../../domain/types'
+import { FinanceConfirm } from '../finance/FinanceConfirm'
+import { ensureFinanceBook } from '../../finance/domain/book'
+import {
+  applyFinanceClarification,
+  commitParsedEvents,
+  interpretFinance,
+  recordValuesFromEvent,
+  type FinanceBrainResult,
+  type ParsedFinanceEvent,
+} from '../../finance'
+import { useAppStore } from '../../state/store'
 import { AiRequestError } from '../../lib/aiClient'
 import {
   captureConfirmLabel,
@@ -48,10 +59,13 @@ function assistantLine(result: CaptureResult) {
 export function CaptureSheet({ open, workspace, onClose, onOpenForm, onConfirm }: CaptureSheetProps) {
   const plain = usePlainLanguage()
   const { showToast } = useToast()
+  const { saveFinance, saveRecord } = useAppStore()
   const [prompt, setPrompt] = useState('')
   const [status, setStatus] = useState<Status>('idle')
   const [error, setError] = useState<string | null>(null)
   const [result, setResult] = useState<CaptureResult | null>(null)
+  const [financeResult, setFinanceResult] = useState<FinanceBrainResult | null>(null)
+  const financeSource = useRef('')
   const [history, setHistory] = useState<HistoryTurn[]>([])
   const [correcting, setCorrecting] = useState(false)
   const [correction, setCorrection] = useState('')
@@ -78,6 +92,8 @@ export function CaptureSheet({ open, workspace, onClose, onOpenForm, onConfirm }
     setCorrecting(false)
     setCorrection('')
     setReward(null)
+    setFinanceResult(null)
+    financeSource.current = ''
     lastAttempt.current = null
   }
 
@@ -109,6 +125,35 @@ export function CaptureSheet({ open, workspace, onClose, onOpenForm, onConfirm }
     setError(null)
     setCorrecting(false)
     setCorrection('')
+
+    if (workspace.kind === 'finance') {
+      const book = ensureFinanceBook(workspace.finance)
+      const interpreted =
+        financeResult?.kind === 'needs_clarification'
+          ? applyFinanceClarification(financeSource.current || next, next, book, financeResult.partial)
+          : interpretFinance(next, book)
+      financeSource.current = interpreted.kind === 'unparsed' ? next : interpreted.source
+      setFinanceResult(interpreted)
+      setHistory((current) => [
+        ...current,
+        { role: 'user', content: next },
+        {
+          role: 'assistant',
+          content:
+            interpreted.kind === 'needs_clarification'
+              ? interpreted.question
+              : interpreted.kind === 'events'
+                ? 'Propuesta financiera'
+                : 'No pude estructurar ese movimiento.',
+        },
+      ])
+      setPrompt('')
+      setStatus(interpreted.kind === 'unparsed' ? 'error' : 'idle')
+      if (interpreted.kind === 'unparsed') {
+        setError('Cuéntame qué pasó con el dinero: cantidad, y si puedes, moneda o cuenta.')
+      }
+      return
+    }
 
     try {
       const nextResult = await requestCapture(
@@ -142,6 +187,24 @@ export function CaptureSheet({ open, workspace, onClose, onOpenForm, onConfirm }
     }
   }
 
+  function confirmFinance(events: ParsedFinanceEvent[]) {
+    const book = ensureFinanceBook(workspace.finance)
+    const committed = commitParsedEvents(book, workspace.id, events)
+    saveFinance(workspace.id, committed.book, `Se registraron ${committed.events.length} movimientos financieros.`)
+    for (const event of committed.events) {
+      saveRecord(workspace.id, recordValuesFromEvent(event))
+    }
+    setReward(
+      committed.events.length > 1
+        ? `Registré ${committed.events.length} movimientos.`
+        : 'Listo, lo anoté en Finanzas.',
+    )
+    setFinanceResult(null)
+    setPrompt('')
+    setStatus('idle')
+    setError(null)
+  }
+
   function confirm() {
     if (!result || (result.kind !== 'new_record' && result.kind !== 'update_record')) return
     const existing =
@@ -171,6 +234,8 @@ export function CaptureSheet({ open, workspace, onClose, onOpenForm, onConfirm }
 
   const title = reward
     ? workspace.name
+    : financeResult?.kind === 'events'
+      ? 'Entendí esto'
     : result?.kind === 'new_record' || result?.kind === 'update_record'
       ? captureHeadline(
           result.kind,
@@ -202,6 +267,24 @@ export function CaptureSheet({ open, workspace, onClose, onOpenForm, onConfirm }
         result?.kind !== 'new_record' &&
         result?.kind !== 'update_record' ? (
           <ReentryBanner compact />
+        ) : null}
+
+        {financeResult?.kind === 'needs_clarification' ? (
+          <div className="rounded-2xl border border-white/0 bg-violet-50 px-4 py-3" data-testid="finance-clarification">
+            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-violet-700">Una cosa más</p>
+            <p className="mt-1.5 text-sm text-ink">{financeResult.question}</p>
+          </div>
+        ) : null}
+
+        {financeResult?.kind === 'events' ? (
+          <FinanceConfirm
+            events={financeResult.events}
+            onConfirm={() => confirmFinance(financeResult.events)}
+            onEdit={() => {
+              setCorrecting(true)
+              setCorrection(financeSource.current)
+            }}
+          />
         ) : null}
 
         {result?.kind === 'needs_clarification' ? (
@@ -307,6 +390,7 @@ export function CaptureSheet({ open, workspace, onClose, onOpenForm, onConfirm }
 
         {!reward &&
         !correcting &&
+        financeResult?.kind !== 'events' &&
         result?.kind !== 'new_record' &&
         result?.kind !== 'update_record' &&
         result?.kind !== 'needs_disambiguation' ? (

@@ -20,6 +20,9 @@ import { FollowUps } from '../dashboard/FollowUps'
 import { ActivityFeed } from '../dashboard/ActivityFeed'
 import { WorkspaceComposer } from './WorkspaceComposer'
 import { CaptureLauncher, CaptureSheet } from './CaptureSheet'
+import { FinanceOnboarding } from '../finance/FinanceOnboarding'
+import { FinancePanel } from '../finance/FinancePanel'
+import { ensureFinanceBook } from '../../finance/domain/book'
 import { ReentryBanner } from '../capture/ReentryBanner'
 import { MobileProgressFeed } from '../mobile/MobileProgressFeed'
 import { needsReentry } from '../../metrics/coverage'
@@ -47,7 +50,7 @@ export function WorkspacePage() {
   const { id } = useParams()
   const navigate = useNavigate()
   const [params, setParams] = useSearchParams()
-  const { getWorkspace, activities, saveRecord, deleteRecord, updateWorkspace, deleteWorkspace, setGoal } = useAppStore()
+  const { getWorkspace, activities, saveRecord, saveFinance, deleteRecord, updateWorkspace, deleteWorkspace, setGoal } = useAppStore()
   const { showToast } = useToast()
   const workspace = id ? getWorkspace(id) : undefined
   const experience = useAppExperience()
@@ -160,6 +163,18 @@ export function WorkspacePage() {
 
   const isMobile = experience === 'mobile'
   const showFeed = isMobile && tab === 'resumen'
+  const financeBook = workspace.kind === 'finance' ? ensureFinanceBook(workspace.finance) : undefined
+  const financeNeedsSetup = Boolean(financeBook && !financeBook.setup.complete)
+  const financeBody = financeBook ? (
+    financeNeedsSetup ? (
+      <FinanceOnboarding
+        book={financeBook}
+        onComplete={(book) => saveFinance(workspace.id, book, 'Se configuró el espacio de finanzas.')}
+      />
+    ) : (
+      <FinancePanel book={financeBook} />
+    )
+  ) : null
   const mobileTabs = [
     { id: 'resumen', label: 'Tu progreso' },
     { id: 'tabla', label: 'Tabla' },
@@ -357,6 +372,7 @@ export function WorkspacePage() {
 
       {showFeed ? (
         <div className="space-y-4">
+          {financeBody}
           <MobileProgressFeed
             workspace={workspace}
             period={period}
@@ -378,6 +394,7 @@ export function WorkspacePage() {
 
       {tab === 'resumen' && !isMobile ? (
         <div className="space-y-8">
+          {financeBody}
           <NarrativeSummary workspace={workspace} period={period} />
           <GoalCard
             workspace={workspace}

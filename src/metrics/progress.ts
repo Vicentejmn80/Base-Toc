@@ -124,7 +124,27 @@ function nounFor(workspace: Workspace) {
   return 'registros'
 }
 
+function measureFinance(workspace: Workspace, records: RecordItem[]) {
+  const events = workspace.finance?.events.length
+    ? workspace.finance.events.filter((event) =>
+        records.some((record) => Math.abs((parseDate(event.date)?.getTime() ?? 0) - (recordTime(workspace, record)?.getTime() ?? 0)) < 86400000) ||
+        records.some((record) => record.createdAt.slice(0, 10) === event.date.slice(0, 10)),
+      )
+    : []
+  if (!events.length) return null
+  const display = workspace.finance?.setup.displayCurrency
+  const expenses = events.filter((event) => event.type === 'expense' || event.type === 'fee')
+  const currencies = new Set(expenses.map((event) => event.currency))
+  const currency = display && expenses.some((event) => event.currency === display)
+    ? display
+    : [...currencies][0]
+  const value = expenses.filter((event) => event.currency === currency).reduce((sum, event) => sum + event.amount, 0)
+  return { value, unit: currency, noun: 'gastos' as const }
+}
+
 function measure(workspace: Workspace, records: RecordItem[]) {
+  const finance = workspace.kind === 'finance' ? measureFinance(workspace, records) : null
+  if (finance) return finance
   const schema = readSchema(workspace)
   if (schema.booleanGoal) {
     const done = records.filter((record) => record.values[schema.booleanGoal!.key] === true).length

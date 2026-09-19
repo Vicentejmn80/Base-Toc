@@ -1,3 +1,5 @@
+import type { FinanceBook } from '../finance/domain/types'
+
 export type FieldType = 'text' | 'longText' | 'number' | 'date' | 'select' | 'boolean'
 export type FieldRole = 'amount' | 'date' | 'status' | 'category' | 'identifier' | 'boolean_goal'
 // Reserved for later phases: relation | formula | file | tags | computed
@@ -70,6 +72,7 @@ export interface Workspace {
   fields: Field[]
   records: RecordItem[]
   goals: Goal[]
+  finance?: FinanceBook
 }
 
 export interface ComputedMetric {

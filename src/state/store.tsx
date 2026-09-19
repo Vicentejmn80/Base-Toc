@@ -15,6 +15,7 @@ import type {
   RecordItem,
   Workspace,
 } from '../domain/types'
+import type { FinanceBook } from '../finance/domain/types'
 import { createSeedData } from '../data/seed'
 import { localStorageAdapter } from '../persistence/storage'
 import { createId } from '../lib/id'
@@ -30,7 +31,8 @@ interface AppState {
 type Action =
   | { type: 'hydrate'; workspaces: Workspace[]; activities: ActivityEvent[] }
   | { type: 'create_workspace'; workspace: Workspace; message: string }
-  | { type: 'update_workspace'; id: string; patch: Partial<Pick<Workspace, 'name' | 'description' | 'icon' | 'color'>> }
+  | { type: 'update_workspace'; id: string; patch: Partial<Pick<Workspace, 'name' | 'description' | 'icon' | 'color' | 'finance'>> }
+  | { type: 'save_finance'; workspaceId: string; book: FinanceBook; message: string }
   | { type: 'set_goal'; workspaceId: string; goal: Goal }
   | { type: 'delete_workspace'; id: string }
   | { type: 'upsert_record'; workspaceId: string; record: RecordItem; activity: ActivityEvent }
@@ -74,6 +76,16 @@ function reducer(state: AppState, action: Action): AppState {
         ...state,
         workspaces: state.workspaces.filter((workspace) => workspace.id !== action.id),
         activities: state.activities.filter((item) => item.workspaceId !== action.id),
+      }
+    case 'save_finance':
+      return {
+        ...state,
+        workspaces: state.workspaces.map((workspace) =>
+          workspace.id === action.workspaceId
+            ? { ...workspace, finance: action.book, updatedAt: new Date().toISOString() }
+            : workspace,
+        ),
+        activities: [activityFrom(action.workspaceId, 'record_created', action.message), ...state.activities],
       }
     case 'set_goal':
       return {
@@ -137,7 +149,8 @@ function activityFrom(workspaceId: string, type: ActivityType, message: string, 
 
 interface AppStoreValue extends AppState {
   createWorkspace: (workspace: Workspace) => void
-  updateWorkspace: (id: string, patch: Partial<Pick<Workspace, 'name' | 'description' | 'icon' | 'color'>>) => void
+  updateWorkspace: (id: string, patch: Partial<Pick<Workspace, 'name' | 'description' | 'icon' | 'color' | 'finance'>>) => void
+  saveFinance: (workspaceId: string, book: FinanceBook, message: string) => void
   setGoal: (workspaceId: string, goal: Goal) => void
   deleteWorkspace: (id: string) => void
   saveRecord: (
@@ -193,8 +206,12 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
     })
   }, [])
 
-  const updateWorkspace = useCallback((id: string, patch: Partial<Pick<Workspace, 'name' | 'description' | 'icon' | 'color'>>) => {
+  const updateWorkspace = useCallback((id: string, patch: Partial<Pick<Workspace, 'name' | 'description' | 'icon' | 'color' | 'finance'>>) => {
     dispatch({ type: 'update_workspace', id, patch })
+  }, [])
+
+  const saveFinance = useCallback((workspaceId: string, book: FinanceBook, message: string) => {
+    dispatch({ type: 'save_finance', workspaceId, book, message })
   }, [])
 
   const deleteWorkspace = useCallback((id: string) => {
@@ -262,13 +279,14 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
       ...state,
       createWorkspace,
       updateWorkspace,
+      saveFinance,
       setGoal,
       deleteWorkspace,
       saveRecord,
       deleteRecord,
       getWorkspace,
     }),
-    [state, createWorkspace, updateWorkspace, setGoal, deleteWorkspace, saveRecord, deleteRecord, getWorkspace],
+    [state, createWorkspace, updateWorkspace, saveFinance, setGoal, deleteWorkspace, saveRecord, deleteRecord, getWorkspace],
   )
 
   return <AppStoreContext.Provider value={value}>{children}</AppStoreContext.Provider>
