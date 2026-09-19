@@ -179,19 +179,64 @@ function validateField(value: unknown, index: number): ModelField {
 }
 
 export interface ProgressAnalysis {
-  resumen: string
-  fortalezas: string[]
-  riesgos: string[]
+  observacion: string
+  hipotesis: string
+  pregunta: string
   recomendacion: string
+  experimento?: { descripcion: string; metrica_a_revisar: string }
+  revision?: string
+}
+
+const GENERIC_RECOMMENDATION = [
+  /sigue as[ií]/i,
+  /s[eé] m[aá]s consistente/i,
+  /mejora tu estrategia/i,
+  /mant[eé]n el ritmo/i,
+  /sigue contactando/i,
+  /vas bien,? sigue/i,
+]
+
+export function isGenericRecommendation(text: string) {
+  const value = text.trim()
+  if (GENERIC_RECOMMENDATION.some((pattern) => pattern.test(value))) return true
+  const hasNumber = /\d/.test(value)
+  const hasAction =
+    /prueba|escribe|contacta|registra|limita|cambia|reduce|env[ií]a|pregunta|anota|mide|elige|haz |dedica|corta|var[ií]a|prop[oó]n|revisa/i.test(
+      value,
+    )
+  const hasBound = /d[ií]a|semana|hoy|mañana|contacto|registro|mensaje|sesi[oó]n/i.test(value)
+  if (value.length < 40 && !hasNumber && !hasAction) return true
+  if (!hasNumber && !hasAction && !hasBound) return true
+  return false
 }
 
 export function validateAnalysis(value: unknown): ProgressAnalysis {
   if (!isRecord(value)) throw new ValidationError('La respuesta del modelo no es un objeto.')
+  const observacion = asString(value.observacion ?? value.resumen, 'observacion').slice(0, 400)
+  const hipotesis = asString(value.hipotesis, 'hipotesis').slice(0, 320)
+  const pregunta = asString(value.pregunta, 'pregunta').slice(0, 220)
+  const recomendacion = asString(value.recomendacion, 'recomendacion').slice(0, 360)
+  if (isGenericRecommendation(recomendacion)) {
+    throw new ValidationError(
+      'La recomendación es demasiado genérica. Debe ser una acción concreta, con cantidad o plazo, no un lema.',
+    )
+  }
+
+  const rawExperiment = isRecord(value.experimento) ? value.experimento : null
+  const experimento = rawExperiment
+    ? {
+        descripcion: asString(rawExperiment.descripcion, 'experimento.descripcion').slice(0, 280),
+        metrica_a_revisar: asString(rawExperiment.metrica_a_revisar, 'experimento.metrica_a_revisar').slice(0, 160),
+      }
+    : undefined
+
   return {
-    resumen: asString(value.resumen, 'resumen').slice(0, 400),
-    fortalezas: asStringList(value.fortalezas, 'fortalezas', 1, 3),
-    riesgos: asStringList(value.riesgos, 'riesgos', 1, 3),
-    recomendacion: asString(value.recomendacion, 'recomendacion').slice(0, 320),
+    observacion,
+    hipotesis,
+    pregunta,
+    recomendacion,
+    experimento,
+    revision: asOptionalString(value.revision)?.slice(0, 400),
   }
 }
 

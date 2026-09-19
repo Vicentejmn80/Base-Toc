@@ -6,10 +6,12 @@ import { projectGoal } from '../metrics/goals'
 import { buildProactiveInsights } from '../metrics/insights'
 
 export interface ProgressAnalysis {
-  resumen: string
-  fortalezas: string[]
-  riesgos: string[]
+  observacion: string
+  hipotesis: string
+  pregunta: string
   recomendacion: string
+  experimento?: { descripcion: string; metrica_a_revisar: string }
+  revision?: string
 }
 
 export function buildAnalysisPayload(workspace: Workspace, period: PeriodKey) {

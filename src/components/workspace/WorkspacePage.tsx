@@ -33,6 +33,7 @@ import { fieldByRole } from '../../lib/schema'
 import { AiRequestError } from '../../lib/aiClient'
 import { buildAnalysisPayload, type ProgressAnalysis } from '../../lib/analysisPayload'
 import { requestProgressAnalysis } from '../../lib/analyzeProgress'
+import { describeExperiment, markExperimentReviewed, saveExperiment } from '../../lib/experiments'
 
 const tabs = [
   { id: 'resumen', label: 'Resumen' },
@@ -78,6 +79,7 @@ export function WorkspacePage() {
   const [analysis, setAnalysis] = useState<ProgressAnalysis | null>(null)
   const [analysisStatus, setAnalysisStatus] = useState<'idle' | 'loading' | 'error' | 'ready'>('idle')
   const [analysisError, setAnalysisError] = useState<string | null>(null)
+  const [experimentTick, setExperimentTick] = useState(0)
 
   const filteredRecords = useMemo(() => {
     if (!workspace) return []
@@ -95,6 +97,7 @@ export function WorkspacePage() {
 
   const metrics = scopedWorkspace ? computeMetrics(scopedWorkspace) : []
   const workspaceActivities = activities.filter((item) => item.workspaceId === workspace?.id).slice(0, 20)
+  const experimentFacts = workspace && experimentTick >= 0 ? describeExperiment(workspace) : null
 
   if (!workspace || !scopedWorkspace) {
     return (
@@ -117,12 +120,21 @@ export function WorkspacePage() {
   }
 
   async function analyzeProgress() {
-    if (!scopedWorkspace) return
+    if (!scopedWorkspace || !workspace) return
     setAnalysisStatus('loading')
     setAnalysisError(null)
     try {
-      const payload = buildAnalysisPayload(scopedWorkspace, period)
+      const experiment = describeExperiment(workspace)
+      const payload = {
+        ...buildAnalysisPayload(scopedWorkspace, period),
+        experimentoActivo: experiment,
+      }
       const result = await requestProgressAnalysis(payload)
+      if (experiment?.status === 'due') markExperimentReviewed(workspace.id)
+      if (result.experimento && (!experiment || experiment.status === 'due')) {
+        saveExperiment(workspace.id, result.experimento)
+      }
+      setExperimentTick((current) => current + 1)
       setAnalysis(result)
       setAnalysisStatus('ready')
     } catch (error) {
@@ -358,6 +370,7 @@ export function WorkspacePage() {
             <AnalysisCard
               status={analysisStatus}
               analysis={analysis}
+              experiment={experimentFacts}
               errorMessage={analysisError}
               onRetry={() => void analyzeProgress()}
             />
@@ -376,6 +389,7 @@ export function WorkspacePage() {
           <AnalysisCard
             status={analysisStatus}
             analysis={analysis}
+            experiment={experimentFacts}
             errorMessage={analysisError}
             onRetry={() => void analyzeProgress()}
           />
