@@ -46,7 +46,7 @@ export function Sidebar() {
                 )
               }
             >
-              <WorkspaceIcon name={workspace.icon} color={workspace.color} size="sm" />
+              <WorkspaceIcon name={workspace.icon} color={workspace.color} size="sm" kind={workspace.kind} />
               <span className="truncate">{workspace.name}</span>
             </NavLink>
           ))}

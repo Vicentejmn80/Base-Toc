@@ -12,6 +12,8 @@ import {
 import { computeBooleanCoverage } from './coverage'
 
 export type TrendDirection = 'up' | 'down' | 'flat'
+export type ChangePolarity = 'higher_better' | 'lower_better' | 'neutral'
+export type ChangeTone = 'grow' | 'ease' | 'steady' | 'fresh' | 'quiet'
 
 export interface AreaProgress {
   workspaceId: string
@@ -20,6 +22,7 @@ export interface AreaProgress {
   color: string
   kind: Workspace['kind']
   label: string
+  unit?: string
   periodLabel: string
   current: number
   previous: number
@@ -27,12 +30,24 @@ export interface AreaProgress {
   shortDisplay: string
   observation: string
   comparison: string
+  absoluteDeltaLabel: string | null
+  percentLabel: string | null
+  contextNote: string | null
+  polarity: ChangePolarity
+  tone: ChangeTone
   direction: TrendDirection
   deltaPercent: number | null
+  weeklyAverage: number
   history: number[]
   points: ChartPoint[]
   weeklyHistory: number[]
   isFourWeekHigh: boolean
+}
+
+export interface ProgressObservation {
+  primary: string
+  context?: string
+  secondary?: string
 }
 
 function recordTime(workspace: Workspace, record: RecordItem) {
@@ -62,13 +77,42 @@ function directionOf(current: number, previous: number): TrendDirection {
   return 'flat'
 }
 
-function comparisonLabel(current: number, previous: number) {
-  if (current === 0 && previous === 0) return 'sin movimiento vs. semana anterior'
-  if (previous === 0) return 'nuevo frente a la semana anterior'
-  const delta = percentDelta(current, previous)
-  if (delta === null || delta === 0) return 'igual que la semana anterior'
-  const arrow = delta > 0 ? '↑' : '↓'
-  return `${arrow} ${formatNumber(Math.abs(delta))}% vs. semana anterior`
+function polarityFor(workspace: Workspace, noun: string): ChangePolarity {
+  if (noun === 'gastos' || /gasto/.test(noun)) return 'lower_better'
+  if (workspace.kind === 'finance' && noun !== 'ahorro') return 'lower_better'
+  if (workspace.kind === 'custom') return 'neutral'
+  return 'higher_better'
+}
+
+function toneFor(
+  current: number,
+  previous: number,
+  polarity: ChangePolarity,
+  weeksWithData: number,
+): ChangeTone {
+  if (current === 0 && previous === 0) return 'quiet'
+  if (previous === 0 && current > 0) return 'fresh'
+  const direction = directionOf(current, previous)
+  if (direction === 'flat' || (percentDelta(current, previous) !== null && Math.abs(percentDelta(current, previous) ?? 0) < 10)) {
+    return 'steady'
+  }
+  if (weeksWithData < 2) return 'fresh'
+  const rising = direction === 'up'
+  if (polarity === 'neutral') return 'steady'
+  if (polarity === 'higher_better') return rising ? 'grow' : 'ease'
+  return rising ? 'ease' : 'grow'
+}
+
+function comparisonCopy(
+  current: number,
+  previous: number,
+  formattedDelta: string | null,
+  percent: number | null,
+) {
+  if (current === 0 && previous === 0) return 'sin suficiente información'
+  if (previous === 0) return 'primera semana registrada'
+  if (percent === null || percent === 0) return 'similar a tu promedio'
+  return formattedDelta ?? 'cambio frente a la semana anterior'
 }
 
 function nounFor(workspace: Workspace) {
@@ -127,7 +171,7 @@ function observationFor(workspace: Workspace, value: number, unit: string | unde
   if (workspace.kind === 'finance') {
     return noun === 'ahorro'
       ? `Has ahorrado ${display} esta semana.`
-      : `Has anotado ${display} en gastos esta semana.`
+      : `Esta semana gastaste ${display}.`
   }
   if (workspace.kind === 'habits') {
     const coverage = computeBooleanCoverage(workspace)
@@ -172,8 +216,32 @@ export function buildAreaProgress(workspace: Workspace): AreaProgress {
   const history = dailyHistory(workspace)
   const currentValue = current.value
   const priorWeeks = weeklyHistory.slice(0, 3)
+  const weeksWithData = weeklyHistory.filter((value) => value > 0).length
+  const weeklyAverage = weeklyHistory.reduce((sum, value) => sum + value, 0) / weeklyHistory.length
   const isFourWeekHigh =
     currentValue > 0 && priorWeeks.some((value) => value > 0) && currentValue >= Math.max(...weeklyHistory)
+  const isFourWeekLow =
+    currentValue > 0 && priorWeeks.some((value) => value > 0) && currentValue <= Math.min(...weeklyHistory)
+  const polarity = polarityFor(workspace, current.noun)
+  const delta = currentValue - previous.value
+  const percent = percentDelta(currentValue, previous.value)
+  const absoluteDeltaLabel =
+    previous.value === 0 && currentValue === 0
+      ? null
+      : previous.value === 0
+        ? null
+        : `${delta >= 0 ? '+' : ''}${formatMeasure(delta, current.unit, current.noun)} vs. semana anterior`
+  const percentLabel =
+    percent !== null && Math.abs(percent) > 0 && Math.abs(percent) <= 150
+      ? `${percent > 0 ? '↑' : '↓'} ${formatNumber(Math.abs(percent))}%`
+      : null
+  let contextNote: string | null = null
+  if (currentValue === 0 && previous.value === 0) contextNote = 'Sin suficiente información.'
+  else if (previous.value === 0 && currentValue > 0) contextNote = 'Primera semana registrada.'
+  else if (isFourWeekHigh && current.noun === 'gastos') contextNote = 'Tu mayor gasto en 4 semanas.'
+  else if (isFourWeekHigh) contextNote = 'Tu semana más activa.'
+  else if (isFourWeekLow && polarity === 'higher_better') contextNote = 'Tu menor registro en 4 semanas.'
+  else if (percent !== null && Math.abs(percent) < 10) contextNote = 'Similar a tu promedio.'
 
   return {
     workspaceId: workspace.id,
@@ -182,15 +250,22 @@ export function buildAreaProgress(workspace: Workspace): AreaProgress {
     color: workspace.color,
     kind: workspace.kind,
     label: current.noun,
+    unit: current.unit,
     periodLabel: 'esta semana',
     current: currentValue,
     previous: previous.value,
     display: formatMeasure(currentValue, current.unit, current.noun),
     shortDisplay: formatMeasure(currentValue, current.unit, current.noun),
     observation: observationFor(workspace, currentValue, current.unit, current.noun),
-    comparison: comparisonLabel(currentValue, previous.value),
+    comparison: comparisonCopy(currentValue, previous.value, absoluteDeltaLabel, percent),
+    absoluteDeltaLabel,
+    percentLabel,
+    contextNote,
+    polarity,
+    tone: toneFor(currentValue, previous.value, polarity, weeksWithData),
     direction: directionOf(currentValue, previous.value),
-    deltaPercent: percentDelta(currentValue, previous.value),
+    deltaPercent: percent,
+    weeklyAverage,
     history: history.values,
     points: history.points,
     weeklyHistory,
@@ -225,22 +300,21 @@ export function buildWeeklySummary(workspaces: Workspace[]) {
   return `Esta semana avanzaste en ${active.length} de tus ${workspaces.length} áreas.`
 }
 
-export function buildProgressObservations(workspaces: Workspace[]) {
+export function buildProgressObservations(workspaces: Workspace[]): ProgressObservation | null {
   const areas = buildHomeProgress(workspaces)
-  const lines: string[] = []
-  const lead =
-    areas.find((area) => area.isFourWeekHigh) ??
-    areas.find((area) => area.current > 0) ??
-    areas[0]
-  if (lead && lead.current > 0) {
-    lines.push(lead.observation)
-    if (lead.isFourWeekHigh) {
-      lines.push('Es tu mayor cantidad en las últimas 4 semanas.')
-    } else if (lead.comparison.startsWith('↑') || lead.comparison.startsWith('↓')) {
-      lines.push(lead.comparison.replace('vs. semana anterior', 'respecto de la semana anterior') + '.')
+  const lead = primaryArea(areas)
+  if (!lead) return null
+  if (lead.current <= 0 && lead.previous <= 0) {
+    return {
+      primary: `Esta semana aún no hay movimiento para observar.`,
+      context: lead.contextNote ?? undefined,
     }
   }
-  return lines.slice(0, 3)
+  return {
+    primary: lead.observation,
+    context: lead.contextNote ?? undefined,
+    secondary: lead.absoluteDeltaLabel ?? undefined,
+  }
 }
 
 export function primaryArea(areas: AreaProgress[]) {

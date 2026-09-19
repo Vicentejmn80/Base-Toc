@@ -1,42 +1,35 @@
-import {
-  Activity,
-  Building2,
-  Layers,
-  Sparkles,
-  Wallet,
-  type LucideIcon,
-} from 'lucide-react'
 import { cn } from '../../lib/cn'
-
-const icons: Record<string, LucideIcon> = {
-  building: Building2,
-  wallet: Wallet,
-  activity: Activity,
-  sparkles: Sparkles,
-  layers: Layers,
-}
+import { ProgressGlyph } from '../progress/ProgressGlyph'
 
 export function WorkspaceIcon({
   name,
   color,
   size = 'md',
+  kind,
 }: {
   name: string
   color: string
   size?: 'sm' | 'md' | 'lg'
+  kind?: string
 }) {
-  const Icon = icons[name] ?? Layers
   return (
     <span
       className={cn(
-        'inline-flex items-center justify-center rounded-2xl text-white',
-        size === 'sm' && 'h-8 w-8 rounded-xl',
+        'progress-glyph-frame inline-flex items-center justify-center',
+        size === 'sm' && 'h-8 w-8',
         size === 'md' && 'h-10 w-10',
         size === 'lg' && 'h-12 w-12',
       )}
-      style={{ background: color }}
+      style={{
+        color,
+        background: `color-mix(in srgb, ${color} 14%, white)`,
+      }}
     >
-      <Icon size={size === 'lg' ? 22 : size === 'sm' ? 15 : 18} />
+      <ProgressGlyph
+        name={name}
+        kind={kind}
+        className={cn(size === 'lg' ? 'h-6 w-6' : size === 'sm' ? 'h-4 w-4' : 'h-5 w-5')}
+      />
     </span>
   )
 }

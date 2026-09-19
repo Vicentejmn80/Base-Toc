@@ -14,7 +14,7 @@ export function SpacesPage() {
       </header>
       {workspaces.length === 0 ? (
         <p className="rounded-2xl border border-dashed border-line bg-white px-4 py-8 text-center text-sm text-muted">
-          Aún no tienes espacios. Créalos desde Inicio.
+          Aún no tienes espacios. Créalos desde Hoy.
         </p>
       ) : (
         <div className="space-y-2">
@@ -22,9 +22,9 @@ export function SpacesPage() {
             <Link
               key={workspace.id}
               to={`/workspaces/${workspace.id}`}
-              className="flex min-h-14 items-center gap-3 rounded-2xl border border-line bg-white px-3 py-3 shadow-[var(--shadow-card)]"
+              className="flex min-h-14 items-center gap-3 border-b border-line/70 py-3 last:border-b-0"
             >
-              <WorkspaceIcon name={workspace.icon} color={workspace.color} size="md" />
+              <WorkspaceIcon name={workspace.icon} color={workspace.color} size="md" kind={workspace.kind} />
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-sm font-semibold text-ink">{workspace.name}</span>
                 <span className="block truncate text-xs text-muted">

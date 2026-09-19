@@ -1,30 +1,9 @@
 import { useState } from 'react'
 import { ChevronDown } from 'lucide-react'
-import {
-  Activity,
-  Apple,
-  BookOpen,
-  Briefcase,
-  Building2,
-  Dumbbell,
-  Sparkles,
-  Wallet,
-  type LucideIcon,
-} from 'lucide-react'
 import { Button } from '../ui/Button'
 import { Modal } from '../ui/Modal'
+import { WorkspaceIcon } from '../ui/WorkspaceIcon'
 import type { ExampleCard } from '../../data/exampleGallery'
-
-const iconByType: Record<ExampleCard['icon'], LucideIcon> = {
-  building: Building2,
-  activity: Activity,
-  wallet: Wallet,
-  sparkles: Sparkles,
-  briefcase: Briefcase,
-  book: BookOpen,
-  apple: Apple,
-  dumbbell: Dumbbell,
-}
 
 interface ExamplesGalleryProps {
   examples: ExampleCard[]
@@ -61,19 +40,16 @@ export function ExamplesGallery({
           className={`shrink-0 text-muted transition-transform ${open ? 'rotate-180' : ''}`}
         />
       </button>
-      <div className={open ? 'grid gap-3 sm:grid-cols-2' : 'hidden'}>
+      <div className={open ? '' : 'hidden'}>
         {examples.map((example) => {
-          const Icon = iconByType[example.icon]
           return (
             <button
               key={example.id}
               type="button"
               onClick={() => setSelected(example)}
-              className="rounded-2xl border border-line bg-white p-4 text-left shadow-[var(--shadow-card)] transition-colors hover:border-slate-300"
+              className="border-b border-line/70 py-4 text-left last:border-b-0"
             >
-              <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-soft text-slate-700">
-                <Icon size={17} />
-              </span>
+              <WorkspaceIcon name={example.icon} color="#4f46e5" size="sm" />
               <p className="mt-3 text-sm font-semibold text-ink">{example.title}</p>
               <p className="mt-1 text-sm text-muted">{example.description}</p>
             </button>

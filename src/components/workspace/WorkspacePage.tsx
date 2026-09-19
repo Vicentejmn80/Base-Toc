@@ -293,7 +293,7 @@ export function WorkspacePage() {
       <header className="flex flex-col gap-5 rounded-3xl border border-line bg-white p-5 shadow-[var(--shadow-card)] sm:p-6">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div className="flex items-start gap-3">
-            <WorkspaceIcon name={workspace.icon} color={workspace.color} size="lg" />
+            <WorkspaceIcon name={workspace.icon} color={workspace.color} size="lg" kind={workspace.kind} />
             <div>
               <h1 className="type-title">{workspace.name}</h1>
               <p className="type-meta mt-1.5 max-w-xl">{workspace.description}</p>

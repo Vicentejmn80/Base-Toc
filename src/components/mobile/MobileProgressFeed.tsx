@@ -4,9 +4,9 @@ import { humanizeActivity } from '../../lib/humanizeActivity'
 import { mobilePeriodLabel } from '../../lib/periodCopy'
 import { buildProgressObservations, buildAreaProgress } from '../../metrics/progress'
 import { projectGoal } from '../../metrics/goals'
+import { ProgressCompare } from '../progress/ProgressCompare'
 import { ProgressInsight } from '../progress/ProgressInsight'
 import { Sparkline } from '../progress/Sparkline'
-import { cn } from '../../lib/cn'
 
 interface MobileProgressFeedProps {
   workspace: Workspace
@@ -38,24 +38,12 @@ export function MobileProgressFeed({
         <h2 className="type-title mt-1">{mobilePeriodLabel(period)}</h2>
       </header>
 
-      <div className="flex items-end justify-between gap-4">
-        <div>
-          <p className="text-[1.65rem] font-semibold tracking-tight text-ink">{area.shortDisplay}</p>
-          <p
-            className={cn(
-              'mt-1 text-sm',
-              area.direction === 'up' && 'text-success',
-              area.direction === 'down' && 'text-warning',
-              area.direction === 'flat' && 'text-muted',
-            )}
-          >
-            {area.comparison}
-          </p>
-        </div>
-        <Sparkline values={area.history} />
+      <div className="progress-enter flex items-end justify-between gap-4">
+        <ProgressCompare area={area} size="lg" />
+        <Sparkline values={area.history} className="text-slate-400" />
       </div>
 
-      <ProgressInsight lines={observations} />
+      <ProgressInsight observation={observations} />
 
       {projection ? (
         <div className="space-y-2">

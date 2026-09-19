@@ -27,7 +27,7 @@ export function ProgressPage() {
         <p className="text-sm text-muted">Crea un área para ver tu progreso.</p>
       ) : (
         <>
-          <ProgressInsight lines={observations} />
+          <ProgressInsight observation={observations} />
           <AreaProgressList areas={areas} />
           <ProgressCoach workspaces={workspaces} />
         </>

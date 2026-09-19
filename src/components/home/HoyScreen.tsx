@@ -69,7 +69,7 @@ export function HoyScreen({
       </div>
 
       <div className="mt-10 space-y-10">
-        <ProgressInsight lines={observations} />
+        <ProgressInsight observation={observations} />
         <AreaProgressList areas={areas} />
         <ProgressCoach workspaces={workspaces} />
       </div>

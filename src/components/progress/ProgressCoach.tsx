@@ -1,8 +1,7 @@
 import { useState } from 'react'
 import type { Workspace } from '../../domain/types'
-import { saveExperiment } from '../../lib/experiments'
+import { formatReviewDate, saveExperiment } from '../../lib/experiments'
 import { buildLocalCoach } from '../../metrics/coach'
-import { formatReviewDate } from '../../lib/experiments'
 
 export function ProgressCoach({ workspaces }: { workspaces: Workspace[] }) {
   const [version, setVersion] = useState(0)
@@ -11,19 +10,17 @@ export function ProgressCoach({ workspaces }: { workspaces: Workspace[] }) {
   const review = coach.review
 
   return (
-    <section data-testid="progress-coach" className="space-y-4" key={version}>
-      <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">
-        Coach
-      </p>
+    <section data-testid="progress-coach" className="space-y-5" key={version}>
+      <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">Coach</p>
 
       <CoachLine label="Observación" text={coach.observation} />
       <CoachLine label="Contexto" text={coach.context} />
-      <CoachLine label="Hipótesis" text={coach.hypothesis} />
+      <CoachLine label="Hipótesis" text={coach.hypothesis} hypothesis />
       <CoachLine label="Pregunta" text={coach.question} />
 
       {review ? (
         <div className="space-y-1">
-          <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-slate-400">
+          <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-slate-400">
             {review.status === 'due' ? 'Revisión' : 'Experimento'}
           </p>
           <p className="text-[15px] leading-6 text-ink">{review.descripcion}</p>
@@ -36,7 +33,7 @@ export function ProgressCoach({ workspaces }: { workspaces: Workspace[] }) {
         </div>
       ) : (
         <div className="space-y-2">
-          <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-slate-400">
+          <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-slate-400">
             Experimento
           </p>
           <p className="text-[15px] leading-6 text-muted">{coach.experiment.descripcion}</p>
@@ -56,11 +53,21 @@ export function ProgressCoach({ workspaces }: { workspaces: Workspace[] }) {
   )
 }
 
-function CoachLine({ label, text }: { label: string; text: string }) {
+function CoachLine({
+  label,
+  text,
+  hypothesis = false,
+}: {
+  label: string
+  text: string
+  hypothesis?: boolean
+}) {
   return (
     <div className="space-y-1">
-      <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-slate-400">{label}</p>
-      <p className="text-[15px] leading-6 text-ink">{text}</p>
+      <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-slate-400">{label}</p>
+      <p className={hypothesis ? 'text-[15px] leading-6 italic text-ink/80' : 'text-[15px] leading-6 text-ink'}>
+        {text}
+      </p>
     </div>
   )
 }
