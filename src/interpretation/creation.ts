@@ -29,7 +29,7 @@ const RATIONALE_BY_TEMPLATE = {
     'El ritmo sirve para ver progreso de rendimiento sin depender solo de sensaciones.',
   ],
   habits: [
-    'Fecha, hábito y cumplido hacen posible calcular rachas y porcentaje de cumplimiento real.',
+    'Fecha, hábito y cumplido hacen posible calcular la cobertura semanal y el porcentaje de cumplimiento.',
     'La nota te ayuda a identificar por qué un día salió bien o qué bloqueó el hábito.',
   ],
 } as const

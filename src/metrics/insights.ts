@@ -1,5 +1,5 @@
-import type { RecordItem, Workspace } from '../domain/types'
-import { isWithinDays, parseDate, startOfDay, toIsoDate } from '../lib/dates'
+import type { Workspace } from '../domain/types'
+import { isWithinDays, toIsoDate } from '../lib/dates'
 import { formatAmount, formatNumber, formatPercent } from '../lib/format'
 import {
   isPositiveStatus,
@@ -8,6 +8,13 @@ import {
   recordText,
   signedAmount,
 } from '../lib/schema'
+import {
+  computeBooleanCoverage,
+  coverageInsightText,
+  daysSinceLastRecord,
+  needsReentry,
+  REENTRY_MESSAGE,
+} from './coverage'
 
 export interface ProactiveInsight {
   id: string
@@ -15,23 +22,9 @@ export interface ProactiveInsight {
   priority: number
 }
 
-function datedRecords(workspace: Workspace) {
-  return workspace.records
-    .map((record) => {
-      const date = parseDate(recordDateValue(workspace, record)) ?? parseDate(record.createdAt)
-      return date ? { record, date } : null
-    })
-    .filter((item): item is { record: RecordItem; date: Date } => Boolean(item))
-    .sort((a, b) => b.date.getTime() - a.date.getTime())
-}
-
 function inactivityInsight(workspace: Workspace): ProactiveInsight | null {
-  const rows = datedRecords(workspace)
-  if (rows.length === 0) return null
-  const last = startOfDay(rows[0].date)
-  const now = startOfDay(new Date())
-  const days = Math.floor((now.getTime() - last.getTime()) / (1000 * 60 * 60 * 24))
-  if (days < 3) return null
+  const days = daysSinceLastRecord(workspace)
+  if (days === null || days < 3) return null
   return {
     id: 'inactivity',
     priority: 100,
@@ -39,37 +32,23 @@ function inactivityInsight(workspace: Workspace): ProactiveInsight | null {
   }
 }
 
-function habitsStreakInsight(workspace: Workspace): ProactiveInsight | null {
-  const schema = readSchema(workspace)
-  if (!schema.booleanGoal || !schema.date) return null
-  const doneByDate = new Map<string, boolean>()
-  for (const record of workspace.records) {
-    const day = recordText(record, schema.date)
-    if (!day) continue
-    if (record.values[schema.booleanGoal.key] === true) doneByDate.set(day, true)
-    else if (!doneByDate.has(day)) doneByDate.set(day, false)
-  }
-  const monthPrefix = toIsoDate().slice(0, 7)
-  const days = [...doneByDate.entries()]
-    .filter(([day]) => day.startsWith(monthPrefix))
-    .sort((a, b) => a[0].localeCompare(b[0]))
-  if (days.length < 4) return null
-
-  let best = 0
-  let current = 0
-  for (const [, done] of days) {
-    if (done) {
-      current += 1
-      best = Math.max(best, current)
-    } else {
-      current = 0
-    }
-  }
-  if (best < 3) return null
+function reentryInsight(workspace: Workspace): ProactiveInsight | null {
+  if (!needsReentry(workspace)) return null
   return {
-    id: 'habit_streak',
+    id: 'reentry',
+    priority: 95,
+    text: REENTRY_MESSAGE,
+  }
+}
+
+function coverageInsight(workspace: Workspace): ProactiveInsight | null {
+  const coverage = computeBooleanCoverage(workspace)
+  if (!coverage) return null
+  if (coverage.doneDays === 0 && coverage.previousDoneDays === 0) return null
+  return {
+    id: 'habit_coverage',
     priority: 80,
-    text: `Llevas ${formatNumber(best)} días seguidos cumpliendo hábitos: es tu mejor racha del mes.`,
+    text: coverageInsightText(coverage),
   }
 }
 
@@ -143,7 +122,8 @@ function followUpInsight(workspace: Workspace): ProactiveInsight | null {
 export function buildProactiveInsights(workspace: Workspace) {
   const insights = [
     inactivityInsight(workspace),
-    habitsStreakInsight(workspace),
+    reentryInsight(workspace),
+    coverageInsight(workspace),
     categoryPerformanceInsight(workspace),
     spendCategoryInsight(workspace),
     followUpInsight(workspace),

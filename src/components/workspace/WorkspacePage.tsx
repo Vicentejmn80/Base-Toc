@@ -20,7 +20,9 @@ import { FollowUps } from '../dashboard/FollowUps'
 import { ActivityFeed } from '../dashboard/ActivityFeed'
 import { WorkspaceComposer } from './WorkspaceComposer'
 import { CaptureLauncher, CaptureSheet } from './CaptureSheet'
+import { ReentryBanner } from '../capture/ReentryBanner'
 import { MobileProgressFeed } from '../mobile/MobileProgressFeed'
+import { needsReentry } from '../../metrics/coverage'
 import { computeMetrics } from '../../metrics'
 import { isWithinPeriod, type PeriodKey } from '../../lib/dates'
 import type { Goal, RecordItem } from '../../domain/types'
@@ -341,6 +343,8 @@ export function WorkspacePage() {
         </div>
       </header>
       )}
+
+      {needsReentry(workspace) ? <ReentryBanner /> : null}
 
       {showFeed ? (
         <div className="space-y-4">

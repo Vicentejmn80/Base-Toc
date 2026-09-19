@@ -18,6 +18,7 @@ import {
   recordText,
   signedAmount,
 } from '../lib/schema'
+import { computeBooleanCoverage, coverageDisplay, coverageHint } from './coverage'
 
 function num(value: FieldValue) {
   return typeof value === 'number' ? value : Number(value) || 0
@@ -215,31 +216,21 @@ function habitMetrics(workspace: Workspace): ComputedMetric[] {
   })
   const done = records.filter((record) => bool(recordValue(record, schema.booleanGoal))).length
   const rate = records.length === 0 ? 0 : (done / records.length) * 100
-  let streak = 0
-  const uniqueDays = [
-    ...new Set(
-      records
-        .filter((record) => bool(recordValue(record, schema.booleanGoal)))
-        .map((record) => (schema.date ? recordText(record, schema.date) : toIsoDate(parseDate(record.createdAt) ?? new Date()))),
-    ),
-  ]
-    .filter(Boolean)
-    .sort()
-  const cursor = uniqueDays[uniqueDays.length - 1]
-  const today = toIsoDate()
-  const yesterday = toIsoDate(daysFromNow(-1))
-  if (cursor === today || cursor === yesterday) {
-    const daySet = new Set(uniqueDays)
-    let offset = cursor === today ? 0 : 1
-    while (daySet.has(toIsoDate(daysFromNow(-offset)))) {
-      streak += 1
-      offset += 1
-    }
-  }
+  const coverage = computeBooleanCoverage(workspace)
 
   return [
     { id: 'done', label: 'Días cumplidos', value: done, display: formatNumber(done) },
-    { id: 'streak', label: 'Racha actual', value: streak, display: `${streak} días` },
+    ...(coverage
+      ? [
+          {
+            id: 'coverage',
+            label: 'Cobertura de la semana',
+            value: coverage.doneDays,
+            display: coverageDisplay(coverage),
+            hint: coverageHint(coverage),
+          },
+        ]
+      : []),
     { id: 'rate', label: 'Cumplimiento', value: rate, display: formatPercent(rate) },
     { id: 'logs', label: 'Registros', value: records.length, display: formatNumber(records.length) },
   ]

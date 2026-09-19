@@ -49,7 +49,7 @@ export const SUGGESTED_COMMANDS: Record<Workspace['kind'], string[]> = {
     '¿Cuántas sesiones registré?',
   ],
   habits: [
-    '¿Cuál es mi racha actual?',
+    '¿Cuál es mi cobertura de la semana?',
     '¿Qué porcentaje cumplí?',
     '¿Cuántos días cumplí?',
   ],
@@ -130,9 +130,15 @@ export function runCommand(question: string, workspace: Workspace): CommandResul
     }
   }
 
-  if (workspace.kind === 'habits') {
-    if (matchAny(q, ['racha'])) {
-      return ok(question, `Tu racha actual es ${metrics.find((m) => m.id === 'streak')?.display ?? '0 días'}.`)
+  if (readSchema(workspace).booleanGoal) {
+    if (matchAny(q, ['racha', 'cobertura'])) {
+      const coverage = metrics.find((m) => m.id === 'coverage')
+      return ok(
+        question,
+        coverage
+          ? `Tu cobertura de la semana es ${coverage.display}.`
+          : 'Todavía no hay suficientes días para calcular la cobertura de la semana.',
+      )
     }
     if (matchAny(q, ['porcentaje', 'cumpl'])) {
       return ok(question, `Tu cumplimiento es ${metrics.find((m) => m.id === 'rate')?.display ?? '0%'}.`)

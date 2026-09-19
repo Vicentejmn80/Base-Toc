@@ -74,7 +74,7 @@ export const exampleGallery: ExampleCard[] = [
     id: 'habits',
     icon: 'sparkles',
     title: 'Hábitos',
-    description: 'Seguimiento diario y rachas de cumplimiento.',
+    description: 'Seguimiento diario y cobertura de cumplimiento.',
     prompt: 'Quiero medir mis hábitos diarios y ver mi porcentaje de cumplimiento.',
     tableColumns: ['Fecha', 'Hábito', 'Cumplido', 'Nota'],
     tableRows: [
@@ -84,7 +84,7 @@ export const exampleGallery: ExampleCard[] = [
     ],
     metrics: [
       { label: 'Cumplimiento', value: '74%' },
-      { label: 'Racha', value: '5 días' },
+      { label: 'Cobertura', value: '5 de 7 días' },
       { label: 'Registros', value: '31' },
     ],
   },

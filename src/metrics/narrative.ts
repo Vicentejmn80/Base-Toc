@@ -257,33 +257,32 @@ function fitnessSummary(workspace: Workspace, period: PeriodKey): NarrativeSumma
 function habitsSummary(workspace: Workspace, period: PeriodKey): NarrativeSummary {
   const schema = readSchema(workspace)
   const { current, previous, canCompare } = splitPeriods(workspace, period)
-  const rate = (list: RecordItem[]) => {
-    if (list.length === 0) return 0
-    const done = list.filter((record) => record.values[schema.booleanGoal!.key] === true).length
-    return (done / list.length) * 100
-  }
+  const coveredDays = (list: RecordItem[]) =>
+    new Set(
+      list
+        .filter((record) => record.values[schema.booleanGoal!.key] === true)
+        .map((record) => (schema.date ? recordText(record, schema.date) : record.createdAt.slice(0, 10))),
+    ).size
 
-  const currentRate = rate(current)
-  const doneDays = new Set(
-    current
-      .filter((record) => record.values[schema.booleanGoal!.key] === true)
-      .map((record) => (schema.date ? recordText(record, schema.date) : record.createdAt)),
-  ).size
+  const currentCovered = coveredDays(current)
+  const windowHint = period === '7d' ? 7 : period === '30d' ? 30 : period === '90d' ? 90 : null
 
   if (!canCompare) {
     return {
       title: 'Resumen de tu periodo',
       hasComparison: false,
       lines: [
-        `Cumpliste ${formatPercent(currentRate)} de tus registros de hábito en este periodo.`,
-        `Sumaste ${formatNumber(doneDays)} días con al menos un hábito marcado como cumplido.`,
+        windowHint
+          ? `Tu cobertura del periodo es ${formatNumber(currentCovered)} de ${formatNumber(windowHint)} días.`
+          : `Sumaste ${formatNumber(currentCovered)} días con al menos un cumplimiento en este periodo.`,
+        'La cobertura se mira en conjunto: un día suelto no define la tendencia.',
         'Aún no hay suficiente historial para comparar este periodo con el anterior.',
       ],
     }
   }
 
-  const previousRate = rate(previous)
-  const rateDelta = currentRate - previousRate
+  const previousCovered = coveredDays(previous)
+  const coverDelta = currentCovered - previousCovered
 
   const habits = new Map<string, { total: number; done: number }>()
   for (const record of current) {
@@ -304,8 +303,8 @@ function habitsSummary(workspace: Workspace, period: PeriodKey): NarrativeSummar
     title: 'Resumen de tu semana',
     hasComparison: true,
     lines: [
-      `Tu cumplimiento ${trendWord(rateDelta)} de ${formatPercent(previousRate)} a ${formatPercent(currentRate)}.`,
-      `En el periodo marcaste ${formatNumber(doneDays)} días con hábitos cumplidos.`,
+      `Tu cobertura ${trendWord(coverDelta)} de ${formatNumber(previousCovered)} a ${formatNumber(currentCovered)} días con cumplimiento.`,
+      'Un día suelto mueve la ventana un poco; la tendencia se mira en conjunto.',
       bestHabit
         ? `${bestHabit.name} fue tu hábito más sólido con ${formatPercent(bestHabit.rate)} de cumplimiento.`
         : 'No hay suficientes hábitos registrados para identificar una tendencia.',

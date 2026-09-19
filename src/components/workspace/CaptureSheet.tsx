@@ -21,6 +21,8 @@ import { Modal } from '../ui/Modal'
 import { useToast } from '../../state/toast'
 import { captureExample } from '../../lib/schema'
 import { CapturePreview } from '../capture/CapturePreview'
+import { ReentryBanner } from '../capture/ReentryBanner'
+import { needsReentry } from '../../metrics/coverage'
 
 interface CaptureSheetProps {
   open: boolean
@@ -180,6 +182,12 @@ export function CaptureSheet({ open, workspace, onClose, onOpenForm, onConfirm }
       onClose={close}
     >
       <div className="space-y-4">
+        {needsReentry(workspace) &&
+        result?.kind !== 'new_record' &&
+        result?.kind !== 'update_record' ? (
+          <ReentryBanner compact />
+        ) : null}
+
         {result?.kind === 'needs_clarification' ? (
           <div className="rounded-2xl border border-white/0 bg-violet-50 px-4 py-3">
             <p className="text-xs font-semibold uppercase tracking-[0.12em] text-violet-700">
