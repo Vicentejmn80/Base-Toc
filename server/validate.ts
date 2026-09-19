@@ -298,7 +298,7 @@ function coerceCaptureValue(
     const match = field.options.find(
       (option) =>
         option.value.toLowerCase() === text.toLowerCase() ||
-        option.label.toLowerCase() === text.toLowerCase(),
+        option.label?.toLowerCase() === text.toLowerCase(),
     )
     if (!match) throw new ValidationError(`"${field.key}" no coincide con una opción válida.`)
     return match.value

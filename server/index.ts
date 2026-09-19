@@ -3,12 +3,12 @@ import dotenv from 'dotenv'
 import express from 'express'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { handleAnalyze } from './handlers/analyze'
-import { handleCapture } from './handlers/capture'
-import { handleCaptureGlobal } from './handlers/captureGlobal'
-import { handleCreation } from './handlers/creation'
-import { handleTranscribe } from './handlers/transcribe'
-import { errorMessage, errorStatus } from './handlers/http'
+import { handleAnalyze } from './handlers/analyze.js'
+import { handleCapture } from './handlers/capture.js'
+import { handleCaptureGlobal } from './handlers/captureGlobal.js'
+import { handleCreation } from './handlers/creation.js'
+import { handleTranscribe } from './handlers/transcribe.js'
+import { errorMessage, errorStatus } from './handlers/http.js'
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 dotenv.config({ path: path.join(root, '.env.local') })

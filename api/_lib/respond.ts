@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { errorMessage, errorStatus } from '../../server/handlers/http'
+import { errorMessage, errorStatus } from '../../server/handlers/http.js'
 
 export async function handlePost(
   req: VercelRequest,

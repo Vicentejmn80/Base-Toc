@@ -1,7 +1,10 @@
 import { randomUUID } from 'node:crypto'
-import { AiConfigError, AiTimeoutError } from '../aiErrors'
-import { completeJson } from '../openai'
-import { parseModelJson, ValidationError, type ModelProposal } from '../validate'
+import { AiConfigError, AiTimeoutError } from '../aiErrors.js'
+import { completeJson } from '../openai.js'
+import { parseModelJson, ValidationError, type ModelProposal } from '../validate.js'
+import { HttpError } from './httpError.js'
+
+export { HttpError }
 
 export interface HistoryTurn {
   role: 'user' | 'assistant'
@@ -145,12 +148,3 @@ export async function runValidated<T>(
   }
 }
 
-export class HttpError extends Error {
-  status: number
-
-  constructor(status: number, message: string) {
-    super(message)
-    this.name = 'HttpError'
-    this.status = status
-  }
-}

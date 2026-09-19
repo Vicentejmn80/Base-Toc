@@ -1,5 +1,5 @@
-import { normalizeName } from './shared'
-import type { GlobalWorkspaceDef, ModelGlobalCapture } from '../validate'
+import { normalizeName } from './shared.js'
+import type { GlobalWorkspaceDef, ModelGlobalCapture } from '../validate.js'
 
 const SPEND_RE = /\b(gaste|pague|pagu[eé]|compr[eé]|pag[oó]|gast[oó]|compr[oó])\b/i
 

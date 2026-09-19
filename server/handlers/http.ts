@@ -1,6 +1,6 @@
-import { AiConfigError, AiTimeoutError } from '../aiErrors'
-import { ValidationError } from '../validate'
-import { HttpError } from './shared'
+import { AiConfigError, AiTimeoutError } from '../aiErrors.js'
+import { ValidationError } from '../validate.js'
+import { HttpError } from './httpError.js'
 
 export function errorStatus(error: unknown) {
   if (error instanceof HttpError) return error.status

@@ -1,5 +1,5 @@
-import { transcribeAudioFile } from '../openai'
-import { HttpError } from './shared'
+import { transcribeAudioFile } from '../openai.js'
+import { HttpError } from './shared.js'
 
 const MAX_BYTES = 10 * 1024 * 1024
 

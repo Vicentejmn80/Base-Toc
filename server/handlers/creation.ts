@@ -1,5 +1,5 @@
-import { CREATION_SYSTEM_PROMPT } from '../prompts'
-import { validateCreation } from '../validate'
+import { CREATION_SYSTEM_PROMPT } from '../prompts.js'
+import { validateCreation } from '../validate.js'
 import {
   HttpError,
   hydrateProposal,
@@ -9,7 +9,7 @@ import {
   type DialogueState,
   type ExistingWorkspace,
   type HistoryTurn,
-} from './shared'
+} from './shared.js'
 
 export async function handleCreation(body: unknown) {
   const payload = body as Record<string, unknown>

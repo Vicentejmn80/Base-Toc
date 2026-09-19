@@ -1,6 +1,6 @@
-import { ANALYZE_SYSTEM_PROMPT } from '../prompts'
-import { validateAnalysis } from '../validate'
-import { HttpError, runValidated, type HistoryTurn } from './shared'
+import { ANALYZE_SYSTEM_PROMPT } from '../prompts.js'
+import { validateAnalysis } from '../validate.js'
+import { HttpError, runValidated, type HistoryTurn } from './shared.js'
 
 export async function handleAnalyze(body: unknown) {
   const payload = body as Record<string, unknown>

@@ -1,9 +1,9 @@
 import { randomUUID } from 'node:crypto'
-import { CAPTURE_GLOBAL_SYSTEM_PROMPT } from '../prompts'
-import { validateGlobalCapture, type GlobalWorkspaceDef } from '../validate'
-import { finalizeCaptureResult, readCaptureWorkspace } from './capture'
-import { applyMoneyRouting } from './moneyRoute'
-import { HttpError, isHistoryTurn, runValidated, type HistoryTurn } from './shared'
+import { CAPTURE_GLOBAL_SYSTEM_PROMPT } from '../prompts.js'
+import { validateGlobalCapture, type GlobalWorkspaceDef } from '../validate.js'
+import { finalizeCaptureResult, readCaptureWorkspace } from './capture.js'
+import { applyMoneyRouting } from './moneyRoute.js'
+import { HttpError, isHistoryTurn, runValidated, type HistoryTurn } from './shared.js'
 
 function readGlobalWorkspaces(raw: unknown): GlobalWorkspaceDef[] {
   if (!Array.isArray(raw) || raw.length === 0) return []
