@@ -14,6 +14,9 @@ export class AudioRecorder {
   private stream: MediaStream | null = null
   private chunks: Blob[] = []
   private startedAt = 0
+  private audioContext: AudioContext | null = null
+  private levelTimer = 0
+  onLevel?: (level: number) => void
 
   async start() {
     if (!canRecordAudio()) {
@@ -32,6 +35,7 @@ export class AudioRecorder {
       if (event.data.size > 0) this.chunks.push(event.data)
     })
     this.startedAt = Date.now()
+    this.listenLevels()
     this.mediaRecorder.start()
   }
 
@@ -47,8 +51,9 @@ export class AudioRecorder {
         () => {
           const mimeType = recorder.mimeType || pickAudioMimeType() || 'audio/webm'
           const blob = new Blob(this.chunks, { type: mimeType })
+          const durationMs = Date.now() - this.startedAt
           this.cleanup()
-          resolve({ blob, mimeType, durationMs: Date.now() - this.startedAt })
+          resolve({ blob, mimeType, durationMs })
         },
         { once: true },
       )
@@ -67,11 +72,45 @@ export class AudioRecorder {
     this.cleanup()
   }
 
+  private listenLevels() {
+    if (!this.stream) return
+    try {
+      const context = new AudioContext()
+      this.audioContext = context
+      const source = context.createMediaStreamSource(this.stream)
+      const analyser = context.createAnalyser()
+      analyser.fftSize = 256
+      source.connect(analyser)
+      const buffer = new Uint8Array(analyser.frequencyBinCount)
+      const tick = () => {
+        analyser.getByteTimeDomainData(buffer)
+        let sum = 0
+        for (const sample of buffer) {
+          const centered = (sample - 128) / 128
+          sum += centered * centered
+        }
+        this.onLevel?.(Math.min(1, Math.sqrt(sum / buffer.length) * 4))
+        this.levelTimer = window.setTimeout(tick, 80)
+      }
+      tick()
+    } catch {
+      this.levelTimer = window.setInterval(() => {
+        this.onLevel?.(0.25 + Math.random() * 0.2)
+      }, 80)
+    }
+  }
+
   private cleanup() {
+    window.clearTimeout(this.levelTimer)
+    window.clearInterval(this.levelTimer)
+    this.levelTimer = 0
+    void this.audioContext?.close()
+    this.audioContext = null
     this.stream?.getTracks().forEach((track) => track.stop())
     this.stream = null
     this.mediaRecorder = null
     this.chunks = []
+    this.onLevel = undefined
   }
 }
 
@@ -92,5 +131,6 @@ export function filenameForMime(mimeType: string) {
   if (mimeType.includes('mp4') || mimeType.includes('m4a')) return 'nota.m4a'
   if (mimeType.includes('ogg')) return 'nota.ogg'
   if (mimeType.includes('mpeg') || mimeType.includes('mp3')) return 'nota.mp3'
+  if (mimeType.includes('wav')) return 'nota.wav'
   return 'nota.webm'
 }

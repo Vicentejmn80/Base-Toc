@@ -1,8 +1,9 @@
 import { randomUUID } from 'node:crypto'
-import { CAPTURE_GLOBAL_SYSTEM_PROMPT } from '../prompts.ts'
-import { validateGlobalCapture, type GlobalWorkspaceDef } from '../validate.ts'
-import { finalizeCaptureResult, readCaptureWorkspace } from './capture.ts'
-import { HttpError, isHistoryTurn, runValidated, type HistoryTurn } from './shared.ts'
+import { CAPTURE_GLOBAL_SYSTEM_PROMPT } from '../prompts'
+import { validateGlobalCapture, type GlobalWorkspaceDef } from '../validate'
+import { finalizeCaptureResult, readCaptureWorkspace } from './capture'
+import { applyMoneyRouting } from './moneyRoute'
+import { HttpError, isHistoryTurn, runValidated, type HistoryTurn } from './shared'
 
 function readGlobalWorkspaces(raw: unknown): GlobalWorkspaceDef[] {
   if (!Array.isArray(raw) || raw.length === 0) return []
@@ -70,11 +71,15 @@ ${workspaces.map(formatWorkspaceBlock).join('\n\n')}
 `
 
   const messages: HistoryTurn[] = [...history, { role: 'user', content: message }]
-  const parsed = await runValidated(
-    system,
-    messages,
-    (value) => validateGlobalCapture(value, workspaces, message),
-    22_000,
+  const parsed = applyMoneyRouting(
+    await runValidated(
+      system,
+      messages,
+      (value) => validateGlobalCapture(value, workspaces, message),
+      22_000,
+    ),
+    workspaces,
+    message,
   )
 
   if (parsed.kind !== 'intents') return parsed

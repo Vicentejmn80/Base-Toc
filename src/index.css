@@ -291,3 +291,88 @@ select {
     animation: none;
   }
 }
+
+.ai-working {
+  position: relative;
+  overflow: hidden;
+  border-radius: 1.25rem;
+  border: 1px solid var(--color-line);
+  background: var(--color-canvas);
+  padding: 1rem 1.1rem 0.95rem;
+}
+
+.ai-working-blobs {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.ai-working-blob {
+  position: absolute;
+  border-radius: 999px;
+  filter: blur(28px);
+  opacity: 0.35;
+}
+
+.ai-working-blob.a {
+  width: 8rem;
+  height: 8rem;
+  left: -1.5rem;
+  top: -2rem;
+  background: #818cf8;
+  animation: blob-drift-a 10s ease-in-out infinite;
+}
+
+.ai-working-blob.b {
+  width: 7rem;
+  height: 7rem;
+  right: -1rem;
+  bottom: -2rem;
+  background: #f9a8d4;
+  animation: blob-drift-b 12s ease-in-out infinite;
+}
+
+.ai-wave {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: flex-end;
+  gap: 4px;
+  height: 28px;
+  margin-top: 0.85rem;
+}
+
+.ai-wave-bar {
+  flex: 1;
+  height: calc(8px + 20px * var(--bar, 0.4));
+  border-radius: 999px;
+  background: linear-gradient(180deg, #93c5fd, #818cf8, #c084fc);
+  transform-origin: center bottom;
+  animation: ai-wave-pulse 0.9s ease-in-out infinite;
+  animation-delay: calc(var(--bar, 0.4) * -0.35s);
+}
+
+@keyframes ai-wave-pulse {
+  0%,
+  100% {
+    transform: scaleY(0.55);
+    opacity: 0.7;
+  }
+  50% {
+    transform: scaleY(1);
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ai-working-blob.a,
+  .ai-working-blob.b,
+  .ai-wave-bar {
+    animation: none;
+  }
+
+  .ai-wave-bar {
+    height: 10px;
+    opacity: 0.7;
+  }
+}

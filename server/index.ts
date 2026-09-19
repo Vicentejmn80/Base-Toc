@@ -3,12 +3,12 @@ import dotenv from 'dotenv'
 import express from 'express'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { handleAnalyze } from './handlers/analyze.ts'
-import { handleCapture } from './handlers/capture.ts'
-import { handleCaptureGlobal } from './handlers/captureGlobal.ts'
-import { handleCreation } from './handlers/creation.ts'
-import { handleTranscribe } from './handlers/transcribe.ts'
-import { errorMessage, errorStatus } from './handlers/http.ts'
+import { handleAnalyze } from './handlers/analyze'
+import { handleCapture } from './handlers/capture'
+import { handleCaptureGlobal } from './handlers/captureGlobal'
+import { handleCreation } from './handlers/creation'
+import { handleTranscribe } from './handlers/transcribe'
+import { errorMessage, errorStatus } from './handlers/http'
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 dotenv.config({ path: path.join(root, '.env.local') })
@@ -33,6 +33,7 @@ async function sendJson(
     const result = await run(body)
     res.json(result)
   } catch (error) {
+    console.error('[api]', error instanceof Error ? error.stack || error.message : error)
     res.status(errorStatus(error)).json({ error: errorMessage(error) })
   }
 }

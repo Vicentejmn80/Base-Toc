@@ -138,6 +138,8 @@ Reglas:
 - Habla en español, tutea, breve.
 - Recibes un resumen liviano de TODOS los espacios (nombre, para qué sirven, campos con roles, y algunos registros existentes).
 - Si el texto cubre DOS temas de DOS espacios distintos, devuelve DOS intents (uno por espacio). Ejemplo: un gasto + contactar colegios.
+- DINERO: si el usuario dice que gastó, pagó o compró, ese hecho va al espacio de Finanzas (nombre que contenga Finanzas, o el que tenga un campo amount de dinero). Aunque mencione farmacia, gimnasio, colegio u otra categoría. NO lo mandes a Hábitos ni al CRM.
+- Si ADEMÁS existe un espacio específico que el usuario nombró y que tiene un campo de pago/membresía (ej. "Gimnasio"), NO elijas en silencio: kind "needs_clarification" preguntando a cuál de los dos (Finanzas o ese espacio).
 - Si es una nota de voz de todo el día, extrae CADA hecho por separado. Un gasto, un colegio, una carrera y un hábito son intents distintos, aunque vengan en el mismo relato.
 - Si cubre VARIOS ítems del MISMO espacio (tres colegios nuevos), devuelve varios intents de ese workspaceId, o UN intent needs_clarification de ese espacio si faltan nombres/identificadores.
 - SOLO extrae datos que el usuario dijo o que se deducen de forma inequívoca (ej. "hoy" → la fecha de hoy). NUNCA inventes un colegio, monto, hábito, estado o fecha.

@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from 'react'
-import { Mic, Paperclip, ArrowUp, AudioLines, Square } from 'lucide-react'
+import { Mic, Paperclip, ArrowUp, Square } from 'lucide-react'
 import { cn } from '../../lib/cn'
 import { AudioRecorder, canRecordAudio } from '../../lib/audioRecorder'
 import { transcribeVoiceNote } from '../../lib/transcribeAudio'
 import { AiRequestError } from '../../lib/aiClient'
 import type { VoiceScope } from '../../lib/voiceCapture'
+import { AiWorkingState } from '../capture/AiWorkingState'
 
 interface PromptBoxProps {
   value: string
@@ -39,6 +40,8 @@ export function PromptBox({
   const [focused, setFocused] = useState(false)
   const [phase, setPhase] = useState<VoicePhase>('idle')
   const [elapsed, setElapsed] = useState(0)
+  const [level, setLevel] = useState(0.2)
+  const [stepStartedAt, setStepStartedAt] = useState(0)
   const [voiceError, setVoiceError] = useState<string | null>(null)
   const fieldId = inputId ?? (compact ? 'nexora-prompt-space' : 'nexora-prompt')
   const voiceBusy = phase !== 'idle'
@@ -81,15 +84,18 @@ export function PromptBox({
   async function startRecording() {
     setVoiceError(null)
     const recorder = new AudioRecorder()
+    recorder.onLevel = setLevel
     recorderRef.current = recorder
     await recorder.start()
     setElapsed(0)
+    setStepStartedAt(Date.now())
     setPhase('recording')
   }
 
   async function finishRecording() {
     const recorder = recorderRef.current
     if (!recorder) return
+    setStepStartedAt(Date.now())
     setPhase('transcribing')
     const controller = new AbortController()
     abortRef.current = controller
@@ -184,22 +190,16 @@ export function PromptBox({
             compact ? 'min-h-[52px]' : 'min-h-[84px]',
           )}
         />
-        {phase === 'recording' ? (
-          <div className="mb-2 flex items-center justify-between rounded-xl bg-violet-50 px-3 py-2 text-xs text-violet-700">
-            <span className="inline-flex items-center gap-2">
-              <AudioLines size={14} className="animate-pulse" />
-              Grabando tu nota…
-            </span>
-            <span>{elapsed.toFixed(1)}s</span>
-          </div>
-        ) : null}
-        {phase === 'transcribing' ? (
-          <div className="mb-2 rounded-xl bg-violet-50 px-3 py-2 text-xs text-violet-700">
-            <p className="inline-flex items-center gap-2 font-medium">
-              <AudioLines size={14} className="animate-pulse" />
-              Pasando tu nota a texto…
-            </p>
-            <p className="mt-1 text-violet-600">Dame un segundo, estoy escuchando lo que contaste.</p>
+        {phase === 'recording' || phase === 'transcribing' ? (
+          <div className="mb-3">
+            <AiWorkingState
+              step={phase === 'recording' ? 'listening' : 'transcribing'}
+              level={phase === 'recording' ? level : 0.45}
+              startedAt={stepStartedAt}
+            />
+            {phase === 'recording' ? (
+              <p className="mt-2 text-right text-xs text-muted">{elapsed.toFixed(1)}s</p>
+            ) : null}
           </div>
         ) : null}
         {voiceError ? <p className="mb-2 text-xs text-danger">{voiceError}</p> : null}

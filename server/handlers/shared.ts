@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
-import { completeJson, AiConfigError, AiTimeoutError } from '../openai.ts'
-import { parseModelJson, ValidationError, type ModelProposal } from '../validate.ts'
+import { completeJson, AiConfigError, AiTimeoutError } from '../openai'
+import { parseModelJson, ValidationError, type ModelProposal } from '../validate'
 
 export interface HistoryTurn {
   role: 'user' | 'assistant'

@@ -31,6 +31,7 @@ import { PromptBox } from '../home/PromptBox'
 import { Button } from '../ui/Button'
 import { Modal } from '../ui/Modal'
 import { CapturePreview } from './CapturePreview'
+import { AiWorkingState } from './AiWorkingState'
 
 type Status = 'idle' | 'loading' | 'error'
 type HistoryTurn = { role: 'user' | 'assistant'; content: string }
@@ -340,7 +341,7 @@ export function GlobalCaptureSheet({ open, seed, onClose }: GlobalCaptureSheetPr
           ) : null}
 
           {globalQuestion ? (
-            <div className="rounded-2xl border border-white/0 bg-violet-50 px-4 py-3">
+            <div className="rounded-2xl border border-white/0 bg-violet-50 px-4 py-3" data-testid="global-clarification">
               <p className="text-xs font-semibold uppercase tracking-[0.12em] text-violet-700">
                 {plain ? 'Una cosa más' : 'Necesito un dato más'}
               </p>
@@ -389,22 +390,7 @@ export function GlobalCaptureSheet({ open, seed, onClose }: GlobalCaptureSheetPr
           ) : null}
 
           {status === 'loading' || creationStatus === 'loading' ? (
-            <div className="rounded-2xl border border-line bg-canvas px-4 py-3">
-              <p className="text-sm text-muted">
-                {creationStatus === 'loading'
-                  ? plain
-                    ? 'Dame un segundo, estoy armando este espacio'
-                    : 'Diseñando tu espacio…'
-                  : heard
-                    ? plain
-                      ? 'Estoy viendo a dónde va cada cosa de tu nota'
-                      : captureLoadingCopy(plain)
-                    : captureLoadingCopy(plain)}
-              </p>
-              <div className="mt-3 h-1 overflow-hidden rounded-full bg-soft">
-                <div className="h-full w-2/3 animate-pulse rounded-full bg-[linear-gradient(90deg,#93c5fd,#818cf8,#c084fc)]" />
-              </div>
-            </div>
+            <AiWorkingState step="understanding" />
           ) : null}
 
           {status === 'error' || creationStatus === 'error' ? (
@@ -630,7 +616,7 @@ function IntentCard({
       {capture.kind === 'new_record' || capture.kind === 'update_record' ? (
         <div className="flex flex-wrap justify-end gap-2">
           <Button variant="secondary" onClick={onDismiss} disabled={busy}>
-            {plain ? 'Esto no' : 'Descartar'}
+            {plain ? 'Cancelar' : 'Cancelar'}
           </Button>
           <Button variant="secondary" onClick={() => setCorrecting(true)} disabled={busy}>
             Corregir

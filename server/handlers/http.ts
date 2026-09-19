@@ -1,10 +1,10 @@
-import { AiConfigError, AiTimeoutError } from '../openai.ts'
-import { ValidationError } from '../validate.ts'
-import { HttpError } from './shared.ts'
+import { AiConfigError, AiTimeoutError } from '../openai'
+import { ValidationError } from '../validate'
+import { HttpError } from './shared'
 
 export function errorStatus(error: unknown) {
   if (error instanceof HttpError) return error.status
-  if (error instanceof AiConfigError) return 500
+  if (error instanceof AiConfigError) return 503
   if (error instanceof AiTimeoutError) return 504
   if (error instanceof ValidationError) return 502
   return 500

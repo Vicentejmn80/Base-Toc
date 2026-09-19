@@ -1,5 +1,5 @@
-import OpenAI, { toFile } from 'openai'
-import { ValidationError } from './validate.ts'
+import OpenAI from 'openai'
+import { ValidationError } from './validate'
 
 const TIMEOUT_MS = 15_000
 
@@ -43,6 +43,7 @@ export async function transcribeAudioFile(input: {
   for (const model of models) {
     try {
       const client = getClient(60_000)
+      const { toFile } = await import('openai')
       const file = await toFile(input.buffer, input.filename, { type: input.mimeType })
       const result = await client.audio.transcriptions.create({
         file,

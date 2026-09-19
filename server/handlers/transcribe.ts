@@ -1,5 +1,5 @@
-import { transcribeAudioFile } from '../openai.ts'
-import { HttpError } from './shared.ts'
+import { transcribeAudioFile } from '../openai'
+import { HttpError } from './shared'
 
 const MAX_BYTES = 10 * 1024 * 1024
 
@@ -41,6 +41,18 @@ export async function handleTranscribe(body: unknown) {
     throw new HttpError(400, 'La nota es demasiado larga. Prueba en partes más cortas.')
   }
 
-  const transcript = await transcribeAudioFile({ buffer, filename, mimeType })
-  return { transcript }
+  try {
+    const transcript = await transcribeAudioFile({ buffer, filename, mimeType })
+    return { transcript }
+  } catch (error) {
+    if (error instanceof HttpError) throw error
+    const message = error instanceof Error ? error.message : ''
+    if (/corrupt|unsupported|invalid|400|formato/i.test(message)) {
+      throw new HttpError(400, 'No pude leer esa nota. El audio llegó dañado o en un formato que no entiendo. Grábala otra vez.')
+    }
+    if (/empty|vacía|vacia/i.test(message)) {
+      throw new HttpError(400, 'La transcripción quedó vacía. Prueba hablar un poco más cerca.')
+    }
+    throw error
+  }
 }

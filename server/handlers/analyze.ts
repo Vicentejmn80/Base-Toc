@@ -1,6 +1,6 @@
-import { ANALYZE_SYSTEM_PROMPT } from '../prompts.ts'
-import { validateAnalysis } from '../validate.ts'
-import { HttpError, runValidated, type HistoryTurn } from './shared.ts'
+import { ANALYZE_SYSTEM_PROMPT } from '../prompts'
+import { validateAnalysis } from '../validate'
+import { HttpError, runValidated, type HistoryTurn } from './shared'
 
 export async function handleAnalyze(body: unknown) {
   const payload = body as Record<string, unknown>

@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { handlePost } from '../_lib/respond.ts'
-import { handleTranscribe } from '../../server/handlers/transcribe.ts'
+import { handlePost } from '../_lib/respond'
+import { handleTranscribe } from '../../server/handlers/transcribe'
 
 export const config = {
   api: {

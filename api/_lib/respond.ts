@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { errorMessage, errorStatus } from '../../server/handlers/http.ts'
+import { errorMessage, errorStatus } from '../../server/handlers/http'
 
 export async function handlePost(
   req: VercelRequest,
@@ -15,6 +15,7 @@ export async function handlePost(
     const result = await run(req.body ?? {})
     return res.status(200).json(result)
   } catch (error) {
+    console.error('[api]', error instanceof Error ? error.stack || error.message : error)
     return res.status(errorStatus(error)).json({ error: errorMessage(error) })
   }
 }

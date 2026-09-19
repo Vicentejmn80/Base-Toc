@@ -1,10 +1,10 @@
-import { CAPTURE_SYSTEM_PROMPT } from '../prompts.ts'
+import { CAPTURE_SYSTEM_PROMPT } from '../prompts'
 import {
   validateCapture,
   type CaptureFieldDef,
   type CaptureRecordSummary,
   type ModelCapture,
-} from '../validate.ts'
+} from '../validate'
 import {
   captureTokenHits,
   HttpError,
@@ -12,7 +12,7 @@ import {
   normalizeName,
   runValidated,
   type HistoryTurn,
-} from './shared.ts'
+} from './shared'
 
 export interface CaptureWorkspaceContext {
   name: string
