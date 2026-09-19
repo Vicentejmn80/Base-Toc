@@ -1,14 +1,12 @@
-import type { ReactNode } from 'react'
-import type { ActivityEvent, Goal, Workspace } from '../../domain/types'
+import type { ActivityEvent, Workspace } from '../../domain/types'
 import type { PeriodKey } from '../../lib/dates'
-import { formatDateTime } from '../../lib/dates'
 import { humanizeActivity } from '../../lib/humanizeActivity'
 import { mobilePeriodLabel } from '../../lib/periodCopy'
-import { buildNarrativeSummary } from '../../metrics/narrative'
-import { buildProactiveInsights } from '../../metrics/insights'
+import { buildProgressObservations, buildAreaProgress } from '../../metrics/progress'
 import { projectGoal } from '../../metrics/goals'
-import { MomentCard } from './MomentCard'
-import { Button } from '../ui/Button'
+import { ProgressInsight } from '../progress/ProgressInsight'
+import { Sparkline } from '../progress/Sparkline'
+import { cn } from '../../lib/cn'
 
 interface MobileProgressFeedProps {
   workspace: Workspace
@@ -25,134 +23,80 @@ export function MobileProgressFeed({
   onSeeDetail,
   onDefineGoal,
 }: MobileProgressFeedProps) {
-  const narrative = buildNarrativeSummary(workspace, period)
-  const insights = buildProactiveInsights(workspace)
+  const area = buildAreaProgress(workspace)
+  const observations = buildProgressObservations([workspace])
   const goal = workspace.goals[0] ?? null
-  const moments = buildMoments({ workspace, period, activities, narrative, insights, goal })
+  const projection = goal ? projectGoal(workspace, goal) : null
+  const latest = activities.filter((item) => item.type !== 'workspace_created').slice(0, 4)
 
   return (
-    <div className="space-y-4">
-      <header className="px-1">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">Tu progreso</p>
+    <div className="space-y-8">
+      <header>
+        <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">
+          Tu progreso
+        </p>
         <h2 className="type-title mt-1">{mobilePeriodLabel(period)}</h2>
       </header>
 
-      {moments.map((moment) => (
-        <MomentCard key={moment.id} kicker={moment.kicker} footer={moment.footer}>
-          {moment.body}
-        </MomentCard>
-      ))}
-
-      {!goal ? (
-        <MomentCard kicker="Meta">
-          <p className="text-[17px] leading-7 text-ink">Todavía no tienes una meta en este espacio.</p>
-          <Button className="mt-3 min-h-11" variant="secondary" onClick={onDefineGoal}>
-            Definir meta
-          </Button>
-        </MomentCard>
-      ) : null}
-
-      {moments.length === 0 ? (
-        <MomentCard>
-          <p className="text-[17px] leading-7 text-ink">Aún no hay suficiente historial para contarte cómo te fue.</p>
-        </MomentCard>
-      ) : null}
-
-      <Button variant="secondary" className="min-h-12 w-full" onClick={onSeeDetail}>
-        Ver todo el detalle
-      </Button>
-    </div>
-  )
-}
-
-interface FeedMoment {
-  id: string
-  at: string
-  kicker: string
-  body: ReactNode
-  footer?: React.ReactNode
-}
-
-function buildMoments({
-  workspace,
-  period,
-  activities,
-  narrative,
-  insights,
-  goal,
-}: {
-  workspace: Workspace
-  period: PeriodKey
-  activities: ActivityEvent[]
-  narrative: ReturnType<typeof buildNarrativeSummary>
-  insights: ReturnType<typeof buildProactiveInsights>
-  goal: Goal | null
-}): FeedMoment[] {
-  const now = new Date().toISOString()
-  const items: FeedMoment[] = []
-
-  if (narrative.lines[0]) {
-    items.push({
-      id: 'narrative',
-      at: now,
-      kicker: mobilePeriodLabel(period),
-      body: (
-        <div className="space-y-2">
-          <p className="text-[17px] font-medium leading-7 text-ink">{narrative.lines[0]}</p>
-          {narrative.lines.slice(1).map((line) => (
-            <p key={line} className="text-[15px] leading-6 text-muted">
-              {line}
-            </p>
-          ))}
-        </div>
-      ),
-    })
-  }
-
-  insights.forEach((insight, index) => {
-    items.push({
-      id: `insight-${insight.id}`,
-      at: new Date(Date.now() - (2000 + index * 1000)).toISOString(),
-      kicker: 'Para que lo sepas',
-      body: <p className="text-[17px] leading-7 text-ink">{insight.text}</p>,
-    })
-  })
-
-  if (goal) {
-    const projection = projectGoal(workspace, goal)
-    items.push({
-      id: 'goal',
-      at: new Date(Date.now() - 500).toISOString(),
-      kicker: 'Tu meta',
-      body: (
+      <div className="flex items-end justify-between gap-4">
         <div>
-          <p className="text-[17px] font-medium leading-7 text-ink">
+          <p className="text-[1.65rem] font-semibold tracking-tight text-ink">{area.shortDisplay}</p>
+          <p
+            className={cn(
+              'mt-1 text-sm',
+              area.direction === 'up' && 'text-success',
+              area.direction === 'down' && 'text-warning',
+              area.direction === 'flat' && 'text-muted',
+            )}
+          >
+            {area.comparison}
+          </p>
+        </div>
+        <Sparkline values={area.history} />
+      </div>
+
+      <ProgressInsight lines={observations} />
+
+      {projection ? (
+        <div className="space-y-2">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">Meta</p>
+          <p className="text-[17px] leading-7 text-ink">
             Vas en {projection.displayCurrent} de {projection.displayTarget}.
           </p>
-          <p className="mt-1.5 text-[15px] leading-6 text-muted">{projection.projectionText}</p>
+          <p className="text-[15px] leading-6 text-muted">{projection.projectionText}</p>
         </div>
-      ),
-      footer: (
-        <div className="h-2.5 rounded-full bg-soft">
-          <div
-            className="h-full rounded-full bg-[linear-gradient(90deg,#93c5fd,#818cf8,#c084fc)]"
-            style={{ width: `${projection.progress}%` }}
-          />
+      ) : (
+        <button
+          type="button"
+          onClick={onDefineGoal}
+          className="text-sm text-muted underline-offset-4 hover:text-ink hover:underline"
+        >
+          Definir una meta
+        </button>
+      )}
+
+      {latest.length > 0 ? (
+        <div className="space-y-3">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">
+            Hace poco
+          </p>
+          <ul className="space-y-3">
+            {latest.map((activity) => (
+              <li key={activity.id} className="text-[15px] leading-6 text-ink">
+                {humanizeActivity(activity, workspace)}
+              </li>
+            ))}
+          </ul>
         </div>
-      ),
-    })
-  }
+      ) : null}
 
-  for (const activity of activities) {
-    if (activity.type === 'workspace_created') continue
-    items.push({
-      id: activity.id,
-      at: activity.createdAt,
-      kicker: 'Hace poco',
-      body: <p className="text-[17px] leading-7 text-ink">{humanizeActivity(activity, workspace)}</p>,
-      footer: <p className="text-xs text-muted">{formatDateTime(activity.createdAt)}</p>,
-    })
-  }
-
-  return items.sort((a, b) => b.at.localeCompare(a.at))
+      <button
+        type="button"
+        onClick={onSeeDetail}
+        className="text-sm font-medium text-ink underline-offset-4 hover:underline"
+      >
+        Ver el detalle
+      </button>
+    </div>
+  )
 }

@@ -1,15 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
-import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { Database, LineChart, Dumbbell, Wallet } from 'lucide-react'
 import { PromptBox } from './PromptBox'
 import { CreationFlow, type CreationStatus } from '../creation/CreationFlow'
-import { WorkspaceIcon } from '../ui/WorkspaceIcon'
 import { ExamplesGallery } from './ExamplesGallery'
 import { useAppStore } from '../../state/store'
 import { useToast } from '../../state/toast'
-import { useGlobalCapture } from '../../state/globalCapture'
 import { greetingForNow } from '../../lib/dates'
-import { useAppExperience } from '../../lib/experience'
 import {
   continueCreationDialogue,
   emptyDialogueState,
@@ -19,7 +16,7 @@ import {
 import { AiRequestError } from '../../lib/aiClient'
 import type { WorkspaceProposal } from '../../domain/types'
 import { exampleGallery } from '../../data/exampleGallery'
-import { MobileHomeStory } from '../mobile/MobileHomeStory'
+import { HoyScreen } from './HoyScreen'
 
 const quickActions = [
   {
@@ -50,10 +47,8 @@ const quickActions = [
 ]
 
 export function HomeScreen() {
-  const { workspaces, activities } = useAppStore()
-  const experience = useAppExperience()
+  const { workspaces } = useAppStore()
   const { showToast } = useToast()
-  const { openCapture } = useGlobalCapture()
   const navigate = useNavigate()
   const location = useLocation()
   const [prompt, setPrompt] = useState('')
@@ -125,36 +120,8 @@ export function HomeScreen() {
   function handleHomeSubmit(text: string) {
     const next = text.trim()
     if (!next) return
-    if (hasSpaces && dialogueState.stage !== 'awaiting_clarification') {
-      openCapture(next)
-      setPrompt('')
-      return
-    }
     void startFromPrompt(next)
   }
-
-  const spacesSection = hasSpaces ? (
-    <section id="espacios" className="mt-10">
-      <div className="mb-5">
-        <h2 className="type-section">Espacios recientes</h2>
-        <p className="type-meta mt-1">Sistemas que ya estás midiendo.</p>
-      </div>
-      <div className="grid gap-3 sm:grid-cols-2">
-        {workspaces.map((workspace) => (
-          <Link
-            key={workspace.id}
-            to={`/workspaces/${workspace.id}`}
-            className="rounded-2xl border border-line bg-white p-4 shadow-[var(--shadow-card)] transition-transform hover:-translate-y-0.5"
-          >
-            <WorkspaceIcon name={workspace.icon} color={workspace.color} />
-            <p className="mt-3 font-medium">{workspace.name}</p>
-            <p className="mt-1 line-clamp-2 text-sm text-muted">{workspace.description}</p>
-            <p className="mt-3 text-xs text-slate-400">{workspace.records.length} registros</p>
-          </Link>
-        ))}
-      </div>
-    </section>
-  ) : null
 
   const gallery = (
     <ExamplesGallery
@@ -194,18 +161,17 @@ export function HomeScreen() {
     />
   )
 
-  if (experience === 'mobile' && hasSpaces) {
+  if (hasSpaces) {
     return (
       <div>
-        <MobileHomeStory
+        <HoyScreen
           workspaces={workspaces}
-          activities={activities}
-          prompt={prompt}
-          busy={creationStatus === 'loading'}
+          createPrompt={prompt}
+          createBusy={creationStatus === 'loading'}
           assistantQuestion={assistantQuestion}
-          onPromptChange={setPrompt}
-          onSubmit={() => startFromPrompt(prompt)}
-          onVoiceTranscript={(text) => startFromPrompt(text)}
+          onCreatePromptChange={setPrompt}
+          onCreateSubmit={() => void startFromPrompt(prompt)}
+          onCreateVoice={(text) => void startFromPrompt(text)}
           onSoon={(message) => showToast(message)}
         />
         {creationFlow}
@@ -215,57 +181,34 @@ export function HomeScreen() {
 
   return (
     <div>
-      <section className="home-hero">
-        <div className="home-blob home-blob-a" aria-hidden="true" />
-        <div className="home-blob home-blob-b" aria-hidden="true" />
-        <div className="home-blob home-blob-c" aria-hidden="true" />
-        <div className="home-hero-fade" aria-hidden="true" />
+      <section className="mx-auto max-w-xl px-4 pb-2 pt-[max(1.5rem,env(safe-area-inset-top))] sm:px-6 sm:pt-12">
+        <div className="animate-fade-up">
+          <p className="text-sm text-muted">{greetingForNow()}</p>
+          <h1 className="type-title mt-2">
+            Cuéntame qué quieres medir
+          </h1>
+        </div>
 
-        <div className="relative z-10 mx-auto max-w-3xl px-4 sm:px-6">
-          <header className="mb-8 flex items-center justify-between lg:hidden">
-            <div className="flex items-center gap-2">
-              <img src="/icons/icon-192.png" alt="" className="h-8 w-8 rounded-xl ring-1 ring-white/15" />
-              <span className="font-semibold text-white">Nexora</span>
-            </div>
-          </header>
-
-          <div className="animate-fade-up pt-8 text-center sm:pt-16">
-            <p className="text-sm text-slate-300">{greetingForNow()}</p>
-            <h1 className="type-display mt-3 text-white">
-              ¿Qué quieres crear o medir hoy?
-            </h1>
-          </div>
-
-          <div className="animate-fade-up mt-8" style={{ animationDelay: '80ms' }}>
-            {assistantQuestion ? (
-              <div className="mb-3 rounded-2xl border border-white/15 bg-white/10 px-4 py-3 backdrop-blur-sm">
-                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-violet-200">
-                  Clarificación
-                </p>
-                <p className="mt-1.5 text-sm text-slate-100">{assistantQuestion}</p>
-              </div>
-            ) : null}
-            <PromptBox
-              value={prompt}
-              busy={creationStatus === 'loading'}
-              voiceScope={hasSpaces ? 'global' : 'home'}
-              placeholder={
-                hasSpaces
-                  ? 'Cuéntame el día o graba una nota. Yo lo acomodo en cada espacio.'
-                  : undefined
-              }
-              onChange={setPrompt}
-              onSubmit={() => handleHomeSubmit(prompt)}
-              onVoiceTranscript={(text) => {
-                handleHomeSubmit(text)
-              }}
-              onSoon={(message) => showToast(message)}
-            />
-          </div>
+        <div className="animate-fade-up mt-8" style={{ animationDelay: '80ms' }}>
+          {assistantQuestion ? (
+            <p className="mb-3 text-[15px] leading-6 text-ink">{assistantQuestion}</p>
+          ) : null}
+          <PromptBox
+            value={prompt}
+            busy={creationStatus === 'loading'}
+            voiceScope="home"
+            placeholder="Cuéntame qué pasó... o qué quieres empezar a medir."
+            onChange={setPrompt}
+            onSubmit={() => handleHomeSubmit(prompt)}
+            onVoiceTranscript={(text) => {
+              handleHomeSubmit(text)
+            }}
+            onSoon={(message) => showToast(message)}
+          />
         </div>
       </section>
 
-      <div className="mx-auto max-w-3xl px-4 pb-4 sm:px-6">
+      <div className="mx-auto max-w-xl px-4 pb-4 sm:px-6">
         <div className="mt-2 flex flex-wrap justify-center gap-2">
           {quickActions.map((action) => (
             <button
@@ -285,8 +228,7 @@ export function HomeScreen() {
           ))}
         </div>
 
-        {hasSpaces ? spacesSection : gallery}
-        {hasSpaces ? gallery : spacesSection}
+        {gallery}
 
         {creationFlow}
       </div>

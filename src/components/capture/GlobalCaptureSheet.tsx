@@ -33,6 +33,7 @@ import { CapturePreview } from './CapturePreview'
 import { AiWorkingState } from './AiWorkingState'
 import { SaveReward } from './SaveReward'
 import { buildConsolidatedSaveInsight, buildSaveInsight } from '../../metrics/saveInsight'
+import { captureIntentLine } from '../../lib/captureSummary'
 
 type Status = 'idle' | 'loading' | 'error'
 type HistoryTurn = { role: 'user' | 'assistant'; content: string }
@@ -71,6 +72,7 @@ export function GlobalCaptureSheet({ open, seed, onClose }: GlobalCaptureSheetPr
   const [dialogueState, setDialogueState] = useState<CreationDialogueState>(emptyDialogueState)
   const [heard, setHeard] = useState<string | null>(null)
   const [batchReward, setBatchReward] = useState<string | null>(null)
+  const [correctingBatch, setCorrectingBatch] = useState(false)
   const lastAttempt = useRef<string | null>(null)
   const abortRef = useRef<AbortController | null>(null)
 
@@ -91,6 +93,7 @@ export function GlobalCaptureSheet({ open, seed, onClose }: GlobalCaptureSheetPr
     setDialogueState(emptyDialogueState())
     setHeard(null)
     setBatchReward(null)
+    setCorrectingBatch(false)
     lastAttempt.current = null
   }
 
@@ -147,6 +150,7 @@ export function GlobalCaptureSheet({ open, seed, onClose }: GlobalCaptureSheetPr
   }
 
   function applyGlobalResult(message: string, result: GlobalCaptureResult) {
+    setCorrectingBatch(false)
     if (result.kind === 'needs_clarification') {
       setGlobalQuestion(result.question)
       setIntents([])
@@ -361,7 +365,7 @@ export function GlobalCaptureSheet({ open, seed, onClose }: GlobalCaptureSheetPr
     creationStatus !== 'loading' &&
     !busyIntentId &&
     !batchReward &&
-    (Boolean(globalQuestion) || (!hasConfirmable && !hasIntentFollowup))
+    (Boolean(globalQuestion) || correctingBatch || (!hasConfirmable && !hasIntentFollowup))
 
   const confirmable = pendingIntents.filter(
     (intent) => intent.capture.kind === 'new_record' || intent.capture.kind === 'update_record',
@@ -378,8 +382,8 @@ export function GlobalCaptureSheet({ open, seed, onClose }: GlobalCaptureSheetPr
           {batchReward ? <SaveReward text={batchReward} /> : null}
 
           {heard ? (
-            <div className="rounded-2xl border border-line bg-canvas px-4 py-3">
-              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">
                 {plain ? 'Esto es lo que te escuché' : 'Transcripción'}
               </p>
               <p className="mt-1.5 text-[15px] leading-6 text-ink">“{heard}”</p>
@@ -395,7 +399,44 @@ export function GlobalCaptureSheet({ open, seed, onClose }: GlobalCaptureSheetPr
             </div>
           ) : null}
 
-          {intents.map((intent) => (
+          {confirmable.length > 0 && !correctingBatch ? (
+            <div className="space-y-4" data-testid="capture-batch">
+              <p className="text-[15px] leading-6 text-ink">
+                {confirmable.length === 1
+                  ? '1 cosa detectada'
+                  : `${confirmable.length} cosas detectadas`}
+              </p>
+              <ul className="space-y-2">
+                {confirmable.map((intent) => (
+                  <li key={intent.id} className="text-[15px] leading-6 text-ink">
+                    {captureIntentLine(
+                      intent.workspaceName,
+                      workspaces.find((item) => item.id === intent.workspaceId),
+                      intent.capture,
+                    )}
+                  </li>
+                ))}
+              </ul>
+              <div className="flex flex-wrap gap-2">
+                <Button variant="secondary" onClick={() => setCorrectingBatch(true)}>
+                  Corregir
+                </Button>
+                <Button onClick={confirmAll} disabled={Boolean(busyIntentId)}>
+                  Registrar todo
+                </Button>
+              </div>
+            </div>
+          ) : null}
+
+          {intents
+            .filter((intent) => {
+              if (intent.status !== 'pending') return intent.status === 'saved'
+              if (intent.capture.kind === 'new_record' || intent.capture.kind === 'update_record') {
+                return correctingBatch
+              }
+              return true
+            })
+            .map((intent) => (
             <IntentCard
               key={intent.id}
               intent={intent}
@@ -495,9 +536,9 @@ export function GlobalCaptureSheet({ open, seed, onClose }: GlobalCaptureSheetPr
           <Button variant="secondary" onClick={close}>
             {pendingIntents.length > 0 ? (plain ? 'Cerrar' : 'Cerrar') : plain ? 'Listo' : 'Cerrar'}
           </Button>
-          {confirmable.length > 1 ? (
+          {confirmable.length > 0 && correctingBatch ? (
             <Button onClick={confirmAll} disabled={Boolean(busyIntentId)}>
-              {plain ? 'Anotar todo' : 'Confirmar todo'}
+              Registrar todo
             </Button>
           ) : null}
         </div>

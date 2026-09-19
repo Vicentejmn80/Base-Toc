@@ -26,7 +26,7 @@ export function Sidebar() {
           }
         >
           <Home size={16} />
-          Inicio
+          Hoy
         </NavLink>
       </nav>
 

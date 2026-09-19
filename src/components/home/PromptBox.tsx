@@ -26,7 +26,7 @@ export function PromptBox({
   value,
   busy,
   compact,
-  placeholder = 'Describe lo que quieres organizar, registrar o mejorar...',
+  placeholder = 'Cuéntame qué pasó...',
   voiceScope,
   inputId,
   onVoiceTranscript,

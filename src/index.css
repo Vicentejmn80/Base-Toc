@@ -129,7 +129,7 @@ select {
 
 .prompt-orbit {
   --ring-angle: 0deg;
-  --ring-size: 2px;
+  --ring-size: 1.25px;
   position: relative;
   isolation: isolate;
   overflow: hidden;
@@ -137,14 +137,13 @@ select {
   padding: var(--ring-size);
   background: conic-gradient(
     from var(--ring-angle),
-    #93c5fd 0deg,
-    #6366f1 105deg,
-    #c084fc 205deg,
-    #f9a8d4 300deg,
-    #93c5fd 360deg
+    rgba(147, 197, 253, 0.25) 0deg,
+    rgba(99, 102, 241, 0.55) 130deg,
+    rgba(192, 132, 252, 0.35) 250deg,
+    rgba(147, 197, 253, 0.25) 360deg
   );
-  animation: prompt-spin 7s linear infinite;
-  box-shadow: 0 0 0 1px rgba(99, 102, 241, 0.08);
+  animation: prompt-spin 16s linear infinite;
+  box-shadow: none;
 }
 
 .prompt-orbit.is-compact {
@@ -152,8 +151,8 @@ select {
 }
 
 .prompt-orbit.is-focused {
-  --ring-size: 3px;
-  filter: saturate(1.1);
+  --ring-size: 1.75px;
+  filter: none;
 }
 
 .prompt-orbit-inner {

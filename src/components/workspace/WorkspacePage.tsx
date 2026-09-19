@@ -23,7 +23,6 @@ import { CaptureLauncher, CaptureSheet } from './CaptureSheet'
 import { ReentryBanner } from '../capture/ReentryBanner'
 import { MobileProgressFeed } from '../mobile/MobileProgressFeed'
 import { needsReentry } from '../../metrics/coverage'
-import { computeMetrics } from '../../metrics'
 import { isWithinPeriod, type PeriodKey } from '../../lib/dates'
 import type { Goal, RecordItem } from '../../domain/types'
 import { recordTitle } from '../../lib/records'
@@ -95,7 +94,6 @@ export function WorkspacePage() {
     return { ...workspace, records: filteredRecords }
   }, [workspace, filteredRecords])
 
-  const metrics = scopedWorkspace ? computeMetrics(scopedWorkspace) : []
   const workspaceActivities = activities.filter((item) => item.workspaceId === workspace?.id).slice(0, 20)
   const experimentFacts = workspace && experimentTick >= 0 ? describeExperiment(workspace) : null
 
@@ -394,7 +392,7 @@ export function WorkspacePage() {
             onRetry={() => void analyzeProgress()}
           />
           <ProactiveInsights workspace={workspace} />
-          <MetricCards metrics={metrics} />
+          <MetricCards workspace={workspace} />
           <div className="grid gap-6 xl:grid-cols-[1.4fr_0.8fr]">
             <ChartsPanel workspace={scopedWorkspace} />
             <div className="space-y-6">
@@ -419,7 +417,7 @@ export function WorkspacePage() {
       {tab === 'graficos' ? (
         <div className="space-y-8">
           <NarrativeSummary workspace={workspace} period={period} />
-          <MetricCards metrics={metrics} />
+          <MetricCards workspace={workspace} />
           <ChartsPanel workspace={scopedWorkspace} />
         </div>
       ) : null}

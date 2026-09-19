@@ -4,7 +4,7 @@ import { cn } from '../../lib/cn'
 import { useGlobalCapture } from '../../state/globalCapture'
 
 const tabs = [
-  { to: '/', label: 'Inicio', icon: Home, match: (path: string) => path === '/' },
+  { to: '/', label: 'Hoy', icon: Home, match: (path: string) => path === '/' },
   { to: '/spaces', label: 'Espacios', icon: LayoutGrid, match: (path: string) => path.startsWith('/spaces') || path.startsWith('/workspaces') },
   { to: '/progress', label: 'Progreso', icon: LineChart, match: (path: string) => path.startsWith('/progress') },
   { to: '/more', label: 'Más', icon: MoreHorizontal, match: (path: string) => path.startsWith('/more') },
