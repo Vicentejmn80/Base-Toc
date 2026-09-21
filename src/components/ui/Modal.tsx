@@ -8,10 +8,11 @@ interface ModalProps {
   children: ReactNode
   footer?: ReactNode
   wide?: boolean
+  extraWide?: boolean
   onClose: () => void
 }
 
-export function Modal({ open, title, description, children, footer, wide, onClose }: ModalProps) {
+export function Modal({ open, title, description, children, footer, wide, extraWide, onClose }: ModalProps) {
   if (!open) return null
 
   return (
@@ -27,7 +28,7 @@ export function Modal({ open, title, description, children, footer, wide, onClos
         aria-modal="true"
         className={cn(
           'relative z-10 max-h-[92dvh] w-full overflow-auto rounded-t-3xl border border-line bg-surface p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] shadow-[var(--shadow-float)] sm:rounded-3xl sm:p-6',
-          wide ? 'max-w-2xl' : 'max-w-lg',
+          extraWide ? 'max-w-6xl' : wide ? 'max-w-2xl' : 'max-w-lg',
         )}
       >
         <div className="mb-5">

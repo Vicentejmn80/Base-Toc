@@ -7,6 +7,7 @@ import { handleAnalyze } from './handlers/analyze.js'
 import { handleCapture } from './handlers/capture.js'
 import { handleCaptureGlobal } from './handlers/captureGlobal.js'
 import { handleCreation } from './handlers/creation.js'
+import { handleImport } from './handlers/import.js'
 import { handleTranscribe } from './handlers/transcribe.js'
 import { errorMessage, errorStatus } from './handlers/http.js'
 import {
@@ -70,6 +71,10 @@ app.post('/api/ai/capture-global', (req, res) => {
 
 app.post('/api/ai/analyze', (req, res) => {
   void sendJson(res, handleAnalyze, req.body)
+})
+
+app.post('/api/ai/import', (req, res) => {
+  void sendJson(res, handleImport, req.body)
 })
 
 app.post('/api/ai/transcribe', (req, res) => {

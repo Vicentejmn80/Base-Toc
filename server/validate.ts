@@ -265,6 +265,7 @@ export type ModelCapture =
 function coerceCaptureValue(
   field: CaptureFieldDef,
   raw: unknown,
+  lenient = false,
 ): string | number | boolean | undefined {
   if (raw === null || raw === undefined || raw === '') return undefined
 
@@ -275,18 +276,23 @@ function coerceCaptureValue(
       if (['true', 'si', 'sí', 'yes', '1'].includes(text)) return true
       if (['false', 'no', '0'].includes(text)) return false
     }
+    if (lenient) return undefined
     throw new ValidationError(`Valor inválido para ${field.key}.`)
   }
 
   if (field.type === 'number') {
     const number = typeof raw === 'number' ? raw : Number(String(raw).replace(',', '.'))
-    if (!Number.isFinite(number)) throw new ValidationError(`"${field.key}" debe ser un número.`)
+    if (!Number.isFinite(number)) {
+      if (lenient) return undefined
+      throw new ValidationError(`"${field.key}" debe ser un número.`)
+    }
     return number
   }
 
   if (field.type === 'date') {
     const text = String(raw).trim()
     if (!/^\d{4}-\d{2}-\d{2}$/.test(text)) {
+      if (lenient) return undefined
       throw new ValidationError(`"${field.key}" debe ser una fecha YYYY-MM-DD.`)
     }
     return text
@@ -301,7 +307,10 @@ function coerceCaptureValue(
         option.value.toLowerCase() === text.toLowerCase() ||
         option.label?.toLowerCase() === text.toLowerCase(),
     )
-    if (!match) throw new ValidationError(`"${field.key}" no coincide con una opción válida.`)
+    if (!match) {
+      if (lenient) return undefined
+      throw new ValidationError(`"${field.key}" no coincide con una opción válida.`)
+    }
     return match.value
   }
 
@@ -542,4 +551,65 @@ export function validateGlobalCapture(
     createSpace,
     commitments: commitments.length ? commitments : undefined,
   }
+}
+
+export interface ModelImportRecord {
+  source: string
+  values: Record<string, string | number | boolean>
+  review: boolean
+  reason?: string
+}
+
+export function coerceImportValues(
+  fields: CaptureFieldDef[],
+  raw: unknown,
+): { values: Record<string, string | number | boolean>; dropped: boolean } {
+  if (!isRecord(raw)) return { values: {}, dropped: true }
+  const values: Record<string, string | number | boolean> = {}
+  let dropped = false
+  for (const field of fields) {
+    if (!(field.key in raw)) continue
+    const coerced = coerceCaptureValue(field, raw[field.key], true)
+    if (coerced === undefined) {
+      if (raw[field.key] !== null && raw[field.key] !== undefined && raw[field.key] !== '') {
+        dropped = true
+      }
+      continue
+    }
+    values[field.key] = coerced
+  }
+  return { values, dropped }
+}
+
+export function validateImport(value: unknown, fields: CaptureFieldDef[]): { records: ModelImportRecord[] } {
+  if (!isRecord(value)) throw new ValidationError('La respuesta del modelo no es un objeto.')
+  if (!Array.isArray(value.records)) {
+    throw new ValidationError('records debe ser una lista.')
+  }
+  if (value.records.length === 0) {
+    throw new ValidationError('El modelo no devolvió registros.')
+  }
+
+  const records: ModelImportRecord[] = value.records.map((item, index) => {
+    if (!isRecord(item)) throw new ValidationError(`records[${index}] no es un objeto.`)
+    const source = typeof item.source === 'string' ? item.source.trim() : ''
+    const flagged = item.review === true
+    const reason = asOptionalString(item.reason)
+    const coerced = coerceImportValues(fields, item.values)
+    const empty = Object.keys(coerced.values).length === 0
+    return {
+      source,
+      values: coerced.values,
+      review: flagged || coerced.dropped || empty,
+      reason:
+        reason ??
+        (empty
+          ? 'No se pudieron extraer campos con confianza'
+          : coerced.dropped
+            ? 'Algunos campos no se pudieron interpretar'
+            : undefined),
+    }
+  })
+
+  return { records }
 }

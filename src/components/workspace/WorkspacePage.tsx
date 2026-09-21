@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
-import { ChevronLeft, MoreHorizontal, Sparkles } from 'lucide-react'
+import { ChevronLeft, MoreHorizontal, Sparkles, Upload } from 'lucide-react'
 import { useAppExperience } from '../../lib/experience'
 import { useAppStore } from '../../state/store'
 import { useToast } from '../../state/toast'
@@ -21,6 +21,7 @@ import { ActivityFeed } from '../dashboard/ActivityFeed'
 import { ActivityHeatmap } from '../progress/ActivityHeatmap'
 import { WorkspaceComposer } from './WorkspaceComposer'
 import { CaptureLauncher, CaptureSheet } from './CaptureSheet'
+import { ImportSheet } from './ImportSheet'
 import { FinanceOnboarding } from '../finance/FinanceOnboarding'
 import { FinancePanel } from '../finance/FinancePanel'
 import { ensureFinanceBook } from '../../finance/domain/book'
@@ -68,6 +69,7 @@ export function WorkspacePage() {
 
   const [formOpen, setFormOpen] = useState(false)
   const [captureOpen, setCaptureOpen] = useState(false)
+  const [importOpen, setImportOpen] = useState(false)
   const [editing, setEditing] = useState<RecordItem | null>(null)
   const [deleting, setDeleting] = useState<RecordItem | null>(null)
   const [goalOpen, setGoalOpen] = useState(false)
@@ -196,6 +198,16 @@ export function WorkspacePage() {
                 type="button"
                 className="block w-full rounded-xl px-3 py-2 text-left text-sm hover:bg-soft"
                 onClick={() => {
+                  setImportOpen(true)
+                  setMenuOpen(false)
+                }}
+              >
+                Importar
+              </button>
+              <button
+                type="button"
+                className="block w-full rounded-xl px-3 py-2 text-left text-sm hover:bg-soft"
+                onClick={() => {
                   openCreate()
                   setMenuOpen(false)
                 }}
@@ -285,6 +297,15 @@ export function WorkspacePage() {
               <option value="all">Todo</option>
             </select>
             <CaptureLauncher onClick={() => setCaptureOpen(true)} />
+            <Button
+              variant="secondary"
+              data-testid="import-open"
+              onClick={() => setImportOpen(true)}
+              className="min-h-11 min-w-11"
+              aria-label="Importar"
+            >
+              <Upload size={16} />
+            </Button>
             {overflowMenu}
           </div>
           {!showFeed ? (
@@ -331,6 +352,10 @@ export function WorkspacePage() {
               <option value="all">Todo</option>
             </select>
             <CaptureLauncher onClick={() => setCaptureOpen(true)} />
+            <Button variant="secondary" data-testid="import-open" onClick={() => setImportOpen(true)} className="min-h-11">
+              <Upload size={16} />
+              Importar
+            </Button>
             <Button variant="ghost" onClick={openCreate} className="min-h-11 text-muted">
               Llenar formulario
             </Button>
@@ -510,6 +535,13 @@ export function WorkspacePage() {
         onConfirm={(values, existing) => {
           saveRecord(workspace.id, values, existing)
         }}
+      />
+
+      <ImportSheet
+        open={importOpen}
+        workspace={workspace}
+        onClose={() => setImportOpen(false)}
+        onImported={() => setTab('tabla')}
       />
 
       <Modal
